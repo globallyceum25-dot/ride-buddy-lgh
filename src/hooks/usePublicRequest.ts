@@ -19,6 +19,7 @@ interface RequestData {
   purpose: string;
   special_requirements?: string;
   notes?: string;
+  stops?: string[];
 }
 
 interface SubmitPublicRequestParams {

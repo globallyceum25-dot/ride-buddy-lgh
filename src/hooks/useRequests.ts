@@ -84,6 +84,7 @@ export interface CreateRequestInput {
   priority?: RequestPriority;
   notes?: string | null;
   passengers?: { name: string; phone?: string; is_primary?: boolean }[];
+  stops?: string[];
 }
 
 // Helper function to fetch profiles for a list of user IDs
@@ -343,7 +344,7 @@ export function useCreateRequest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { passengers, ...requestData } = input;
+      const { passengers, stops, ...requestData } = input;
 
       // Create the request
       const { data: request, error: requestError } = await supabase
@@ -372,6 +373,21 @@ export function useCreateRequest() {
           );
 
         if (passengersError) throw passengersError;
+      }
+
+      // Add stops if provided (for multi-stop trips)
+      if (stops && stops.length > 0) {
+        const { error: stopsError } = await supabase
+          .from('request_stops')
+          .insert(
+            stops.map((location, index) => ({
+              request_id: request.id,
+              location,
+              stop_order: index + 1,
+            }))
+          );
+
+        if (stopsError) throw stopsError;
       }
 
       // Log creation in history
