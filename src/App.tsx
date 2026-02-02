@@ -20,6 +20,7 @@ import Approvals from "./pages/Approvals";
 import Allocations from "./pages/Allocations";
 import TripSchedule from "./pages/TripSchedule";
 import Reports from "./pages/Reports";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -133,6 +134,16 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={['group_admin']}>
                   <Users />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Settings - Group Admin only */}
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute allowedRoles={['group_admin']}>
+                  <Settings />
                 </ProtectedRoute>
               }
             />
