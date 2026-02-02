@@ -42,6 +42,7 @@ export interface Allocation {
     make: string | null;
     model: string | null;
     capacity: number | null;
+    odometer: number | null;
   } | null;
   driver?: {
     id: string;
@@ -148,7 +149,7 @@ export function useAllocations(filters?: { status?: AllocationStatus; date?: str
             id, request_number, purpose, pickup_location, dropoff_location,
             pickup_datetime, passenger_count, priority, status, requester_id
           ),
-          vehicle:vehicles(id, registration_number, make, model, capacity),
+          vehicle:vehicles(id, registration_number, make, model, capacity, odometer),
           driver:drivers(id, user_id, license_number)
         `)
         .order('scheduled_pickup', { ascending: true });
@@ -359,9 +360,10 @@ export function useUpdateAllocationStatus() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, status, ...updates }: { 
+    mutationFn: async ({ id, status, vehicle_id, ...updates }: { 
       id: string; 
       status: AllocationStatus;
+      vehicle_id?: string | null;
       actual_pickup?: string;
       actual_dropoff?: string;
       odometer_start?: number;
@@ -393,11 +395,20 @@ export function useUpdateAllocationStatus() {
           .eq('id', data.request_id);
       }
       
+      // Update vehicle odometer when trip completes
+      if (status === 'completed' && updates.odometer_end && vehicle_id) {
+        await supabase
+          .from('vehicles')
+          .update({ odometer: updates.odometer_end })
+          .eq('id', vehicle_id);
+      }
+      
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['allocations'] });
       queryClient.invalidateQueries({ queryKey: ['requests'] });
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
       toast.success('Allocation status updated');
     },
     onError: (error: Error) => {
