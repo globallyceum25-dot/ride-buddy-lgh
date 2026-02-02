@@ -161,6 +161,14 @@ export function AllocationCard({
         </span>
       </div>
 
+      {/* Passenger Count */}
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+        <Users className="h-3 w-3" />
+        <span>
+          {allocation.request?.passenger_count || 1} passenger{(allocation.request?.passenger_count || 1) !== 1 ? 's' : ''}
+        </span>
+      </div>
+
       {/* Route */}
       <div className="flex items-start gap-1.5 text-xs mb-2">
         <MapPin className="h-3 w-3 mt-0.5 text-primary shrink-0" />
