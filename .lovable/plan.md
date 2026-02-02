@@ -1,287 +1,262 @@
 
-
-# LGH Fleet Management System - Implementation Plan
+# Phase 2: Master Data Management - Implementation Plan
 
 ## Overview
-A full-featured enterprise fleet management system supporting 10+ locations, 200+ staff users, and 50+ vehicles with sophisticated seat-pooling, automated allocation, and multi-level approval workflows.
+Build three management screens (Locations, Vehicles, Drivers) with full CRUD operations, data tables, and proper role-based access control.
 
 ---
 
-## Phase 1: Foundation & Authentication
+## Database Schema Changes
 
-### Database Setup (Supabase)
-- **User Management**: Users table with admin-created accounts, secure authentication
-- **Role System**: Separate roles table (Staff, Location Coordinator, Group Admin, Driver, Approver) with permissions matrix
-- **Audit Logging**: Track all actions for compliance and accountability
+### 1. Create Enums for Vehicles and Drivers
 
-### Authentication & Authorization
-- Admin-only account creation (no self-registration)
-- Role-based dashboard routing (each role sees different interface)
-- Session management with secure token handling
+```sql
+-- Vehicle status enum
+CREATE TYPE vehicle_status AS ENUM ('available', 'in_trip', 'maintenance', 'breakdown', 'retired');
 
----
+-- Vehicle type enum  
+CREATE TYPE vehicle_type AS ENUM ('sedan', 'suv', 'van', 'minibus', 'bus', 'other');
 
-## Phase 2: Master Data Management
+-- Fuel type enum
+CREATE TYPE fuel_type AS ENUM ('petrol', 'diesel', 'electric', 'hybrid', 'cng');
 
-### Location Master
-- Location profiles with addresses, operating hours, GPS coordinates
-- Default pickup points per location
-- Assigned coordinators
+-- Ownership type enum
+CREATE TYPE ownership_type AS ENUM ('owned', 'leased', 'rented');
 
-### Vehicle Master
-- Vehicle registry with registration, type, capacity, fuel type
-- Ownership tracking (owned/leased)
-- Status management (Available/In Trip/Service/Breakdown)
-- Maintenance scheduling with service reminders
-- License and insurance expiry alerts
+-- Driver status enum
+CREATE TYPE driver_status AS ENUM ('available', 'on_trip', 'on_leave', 'inactive');
 
-### Driver Master
-- Driver profiles with license details and expiry tracking
-- Availability schedules and leave management
-- Location assignment (or floating pool)
-- Status tracking and performance notes
+-- License type enum
+CREATE TYPE license_type AS ENUM ('light', 'heavy', 'commercial');
+```
 
-### Routes & Pickup Points
-- Route definitions (from/to locations)
-- Standard pickup points with GPS coordinates
-- Typical duration and distance estimates
-- Time windows for scheduled services
+### 2. Vehicles Table
 
-### Policy & Rules Configuration
-- Booking cutoff times
-- Cancellation and no-show policies
-- Priority rules (medical, executive, shift transport)
-- Seat-sharing eligibility rules
-- Approval workflow rules by request type
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | Primary key |
+| registration_number | text | Unique, required |
+| make | text | e.g., Toyota |
+| model | text | e.g., Hiace |
+| year | integer | Manufacturing year |
+| vehicle_type | vehicle_type | Enum |
+| capacity | integer | Passenger seats |
+| fuel_type | fuel_type | Enum |
+| ownership | ownership_type | Owned/Leased/Rented |
+| status | vehicle_status | Default: available |
+| location_id | uuid | FK to locations (home base) |
+| insurance_expiry | date | For alerts |
+| registration_expiry | date | For alerts |
+| last_service_date | date | Maintenance tracking |
+| next_service_due | date | Maintenance alerts |
+| odometer | integer | Current reading |
+| notes | text | Optional |
+| is_active | boolean | Soft delete |
+| created_at | timestamptz | Auto |
+| updated_at | timestamptz | Auto-updated |
 
----
+### 3. Drivers Table
 
-## Phase 3: Staff Request Module
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | Primary key |
+| user_id | uuid | FK to profiles (links to user account) |
+| employee_id | text | Company ID |
+| license_number | text | Required |
+| license_type | license_type | Light/Heavy/Commercial |
+| license_expiry | date | For alerts |
+| status | driver_status | Default: available |
+| location_id | uuid | FK to locations (assigned base) |
+| is_floating | boolean | Can work any location |
+| emergency_contact | text | Phone number |
+| blood_group | text | Optional |
+| date_joined | date | Employment start |
+| notes | text | Optional |
+| is_active | boolean | Soft delete |
+| created_at | timestamptz | Auto |
+| updated_at | timestamptz | Auto-updated |
 
-### Request Submission
-- Clean, intuitive request form
-- Request types: One-way, Round trip
-- Date/time selection with flexibility buffer
-- Pickup and drop location selection
-- Passenger count and special needs
-- Priority flagging with reason
-- Recurring request support
+### 4. RLS Policies
 
-### Request Workflow
-Draft → Submitted → Pending Approval → Approved/Rejected → Scheduled → In Progress → Completed
+**Vehicles:**
+- Admins (`group_admin`, `location_coordinator`) can manage vehicles
+- All authenticated users can view active vehicles
 
-### Staff Dashboard
-- My Requests list with status filters
-- Request details and trip information
-- Cancellation (within allowed window)
-- Notification center
-
----
-
-## Phase 4: Approval Workflow
-
-### Approver Dashboard
-- Pending approvals queue
-- Request details with staff info, cost center, purpose
-- Approve/Reject with mandatory reason for rejections
-- Bulk approval capabilities
-- Approval history and audit trail
-
-### Approval Rules Engine
-- Route approvals to correct approver (by department, cost center, or request type)
-- Escalation for overdue approvals
-- Auto-notification on approval status changes
+**Drivers:**
+- Admins can manage driver records
+- Drivers can view their own record
+- All authenticated users can view active drivers
 
 ---
 
-## Phase 5: Seat Pooling & Request Merging (Core Feature)
+## Frontend Implementation
 
-### Merge Suggestion Engine
-- Analyze requests for compatibility:
-  - Same date with overlapping time windows
-  - Similar pickup zones and destinations
-  - Route direction alignment
-  - Available seat capacity
-- Score and rank merge candidates
-- Respect VIP "no pooling" flags
+### Shared Components
 
-### Coordinator Merge Interface
-- "Suggest Merges" view showing grouped candidates
-- Visual indicators: time overlap, route similarity, pickup proximity
-- One-click merge to create Trip Groups
-- Pickup order optimization (drag-and-drop)
-- Split/remove requests from groups
-- Capacity and conflict warnings
+**`src/components/shared/DataTable.tsx`**
+- Reusable table component with sorting, filtering, pagination
+- Search functionality
+- Row actions (Edit, Delete, View)
+- Status badges
+- Used across all three management pages
 
-### Trip Groups
-- Consolidated view of merged requests
-- Combined pickup plan with ordered stops
-- Estimated departure and arrival times
-- Total passenger count tracking
+**`src/components/shared/StatusBadge.tsx`**
+- Color-coded status indicators
+- Consistent styling across the app
 
----
+### Locations Page (`/locations`)
 
-## Phase 6: Allocation Engine
+**Components:**
+- `src/pages/Locations.tsx` - Main page
+- `src/components/locations/LocationTable.tsx` - Data table
+- `src/components/locations/LocationDialog.tsx` - Create/Edit form
 
-### Auto-Allocation Logic
-- Match Trip Groups to suitable vehicles:
-  - Smallest vehicle that fits passengers (capacity optimization)
-  - Prefer vehicles at pickup location
-  - Consider vehicle availability and maintenance blocks
-  - Avoid driver overtime
-- Match drivers based on:
-  - License type compatibility
-  - Availability schedule
-  - Current trip conflicts
-  - Location assignment
+**Features:**
+- View all locations in a sortable table
+- Add new location with form validation
+- Edit existing locations
+- Toggle active/inactive status
+- Display assigned coordinators count
+- Show operating hours
 
-### Manual Override
-- Coordinator can override auto-suggestions
-- Drag-and-drop allocation board
-- Conflict detection and warnings
-- Lock allocations once confirmed
+**Form Fields:**
+- Name (required)
+- Code (required, unique)
+- Address
+- City
+- GPS Coordinates (lat/lng)
+- Operating Hours (start/end time)
 
-### Trip Sheet Generation
-- Trip ID with vehicle and driver assignment
-- Linked requests and pickup sequence
-- Planned times and seat allocations
-- Coordinator notes
+### Vehicles Page (`/vehicles`)
 
----
+**Components:**
+- `src/pages/Vehicles.tsx` - Main page
+- `src/components/vehicles/VehicleTable.tsx` - Data table
+- `src/components/vehicles/VehicleDialog.tsx` - Create/Edit form
 
-## Phase 7: Driver Portal (Mobile Responsive)
+**Features:**
+- View all vehicles with status indicators
+- Filter by status, type, location
+- Add/Edit vehicle details
+- Track maintenance schedules
+- Alert badges for expiring documents
+- Odometer tracking
 
-### Driver Dashboard
-- Daily trip list with details
-- Accept/confirm trip assignments
-- Navigation to pickup points
+**Form Fields:**
+- Registration Number (required, unique)
+- Make & Model
+- Year
+- Vehicle Type (dropdown)
+- Capacity (number)
+- Fuel Type (dropdown)
+- Ownership Type (dropdown)
+- Home Location (dropdown)
+- Insurance Expiry Date
+- Registration Expiry Date
+- Last Service / Next Service Due
+- Current Odometer
 
-### Trip Execution
-- Trip start/end confirmation
-- Arrive at pickup notifications
-- Passenger boarding check-in (per request)
-- No-show marking with reason
-- Odometer recording (start/end)
-- Fuel top-up logging
-- Toll/parking expense entry
-- Incident notes
+### Drivers Page (`/drivers`)
 
-### Trip Statuses
-Scheduled → Driver Assigned → Confirmed → Started → Completed (or Cancelled/Breakdown)
+**Components:**
+- `src/pages/Drivers.tsx` - Main page
+- `src/components/drivers/DriverTable.tsx` - Data table
+- `src/components/drivers/DriverDialog.tsx` - Create/Edit form
 
----
+**Features:**
+- View all drivers with status
+- Filter by status, location
+- Link driver to existing user account
+- Track license expiry
+- Show availability status
+- Mark as floating driver
 
-## Phase 8: Notifications System
-
-### In-App Notifications
-- Real-time notification bell with badge count
-- Notification center with history
-- Mark as read functionality
-
-### Email Notifications
-- Request submitted confirmation
-- Approval status updates
-- Trip allocation details (vehicle, driver, pickup time)
-- Schedule changes and cancellations
-- No-show alerts
-
-### WhatsApp/SMS (Integration Ready)
-- Structure for external messaging service integration
-- Template messages for key events
-- Delivery status tracking
+**Form Fields:**
+- Link to User Account (dropdown from profiles with driver role)
+- License Number (required)
+- License Type (dropdown)
+- License Expiry Date
+- Assigned Location (dropdown)
+- Is Floating (checkbox)
+- Emergency Contact
+- Blood Group
+- Date Joined
 
 ---
 
-## Phase 9: Dashboards & Analytics
+## Data Hooks (React Query)
 
-### Location Coordinator Dashboard
-- Today's requests overview
-- Pending allocations
-- Active trips tracker
-- Vehicle utilization meter
-- Driver availability status
-- Alerts (maintenance due, license expiry)
+**`src/hooks/useLocations.ts`**
+- `useLocations()` - Fetch all locations
+- `useCreateLocation()` - Create mutation
+- `useUpdateLocation()` - Update mutation
+- `useDeleteLocation()` - Delete mutation
 
-### Group Admin Dashboard
-- All locations summary view
-- Organization-wide KPIs
-- Cross-location comparisons
-- Trend analysis
+**`src/hooks/useVehicles.ts`**
+- `useVehicles()` - Fetch all vehicles with location join
+- `useCreateVehicle()` - Create mutation
+- `useUpdateVehicle()` - Update mutation
 
-### Key Performance Indicators
-- Request fulfillment rate
-- Seat utilization percentage
-- Vehicle utilization (hours/trips per day)
-- On-time pickup rate
-- Cancellation and no-show rates
-- Cost per trip (when expense tracking enabled)
-- Driver workload distribution
+**`src/hooks/useDrivers.ts`**
+- `useDrivers()` - Fetch all drivers with profile/location join
+- `useCreateDriver()` - Create mutation
+- `useUpdateDriver()` - Update mutation
 
 ---
 
-## Phase 10: Reports & Exports
+## Route Updates
 
-### Operational Reports
-- Daily trip sheet by location
-- Weekly/monthly utilization reports
-- Vehicle maintenance schedule
-- Driver assignment history
-
-### Administrative Reports
-- No-show analysis by department/staff
-- Cost center usage summary
-- Approval turnaround times
-- Audit trail reports
-
-### Export Options
-- Excel/CSV downloads
-- PDF generation for official reports
-- Scheduled report delivery
+Add to `src/App.tsx`:
+- `/locations` - Group Admin only
+- `/vehicles` - Location Coordinator & Group Admin
+- `/drivers` - Location Coordinator & Group Admin
 
 ---
 
-## User Interface Design
+## Files to Create
 
-### Clean & Professional Theme
-- Corporate color palette with clear visual hierarchy
-- Data tables with sorting, filtering, pagination
-- Status badges and progress indicators
-- Responsive design for all screen sizes
+| File | Purpose |
+|------|---------|
+| `src/pages/Locations.tsx` | Location management page |
+| `src/pages/Vehicles.tsx` | Vehicle management page |
+| `src/pages/Drivers.tsx` | Driver management page |
+| `src/components/locations/LocationTable.tsx` | Location data table |
+| `src/components/locations/LocationDialog.tsx` | Location form dialog |
+| `src/components/vehicles/VehicleTable.tsx` | Vehicle data table |
+| `src/components/vehicles/VehicleDialog.tsx` | Vehicle form dialog |
+| `src/components/drivers/DriverTable.tsx` | Driver data table |
+| `src/components/drivers/DriverDialog.tsx` | Driver form dialog |
+| `src/hooks/useLocations.ts` | Location data hooks |
+| `src/hooks/useVehicles.ts` | Vehicle data hooks |
+| `src/hooks/useDrivers.ts` | Driver data hooks |
 
-### Role-Specific Layouts
-- **Staff**: Simple request form, my requests, trip details
-- **Approver**: Approval queue, decision interface
-- **Coordinator**: Requests inbox, merge board, allocation calendar, fleet overview
-- **Admin**: Masters management, policies, reports, audit logs
-- **Driver**: Trip list, execution screens (mobile-optimized)
+## Files to Modify
 
----
-
-## Technical Architecture
-
-### Backend (Supabase)
-- PostgreSQL database with proper relationships
-- Row-Level Security for role-based data access
-- Edge Functions for allocation engine and notifications
-- Real-time subscriptions for live updates
-
-### Security & Compliance
-- Complete audit trail
-- Role-based access control
-- Mandatory reason fields for rejections/cancellations
-- Data validation at all entry points
+| File | Changes |
+|------|---------|
+| `src/App.tsx` | Add 3 new protected routes |
 
 ---
 
-## Summary
+## Implementation Order
 
-This system will provide LGH with a comprehensive fleet management solution featuring:
-- ✅ Multi-location support with group-wide visibility
-- ✅ Smart seat pooling to optimize vehicle usage
-- ✅ Automated allocation with manual override capability
-- ✅ Full approval workflow
-- ✅ Real-time tracking and notifications
-- ✅ Comprehensive reporting and analytics
-- ✅ Mobile-responsive driver interface
-- ✅ Enterprise-grade security and audit trails
+1. **Database Migration** - Create vehicles and drivers tables with enums and RLS
+2. **Locations Page** - Build first (table exists, simpler implementation)
+3. **Vehicles Page** - Build with all tracking features
+4. **Drivers Page** - Build with user account linking
+5. **Route Registration** - Add all routes to App.tsx
 
+---
+
+## UI Design Notes
+
+- Clean data tables with hover states
+- Status badges with distinct colors:
+  - Available: Green
+  - In Trip/On Trip: Blue
+  - Maintenance/On Leave: Yellow
+  - Breakdown/Inactive: Red
+- Alert badges for expiring documents (within 30 days)
+- Responsive design for tablet/mobile
+- Empty states with clear CTAs
+- Toast notifications for all actions
