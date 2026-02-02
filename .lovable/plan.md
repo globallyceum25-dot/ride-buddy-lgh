@@ -1,83 +1,53 @@
 
-# Fix: Merge Allocations Not Working
+# Trip Schedule Module Implementation Plan
 
-## Problem Analysis
-The merge allocations feature has multiple issues:
-1. The submit handler returns silently without feedback when requirements aren't met
-2. No clear UI indication when there aren't enough requests to merge
-3. Missing error handling for database operation failures
-
-## Root Causes Found
-
-### Issue 1: Silent Return in handleSubmit
-```typescript
-const handleSubmit = async () => {
-  if (!vehicleId || !driverId || requests.length < 2) return; // Silent return!
-  // ...
-}
-```
-If validation fails, the function returns without telling the user why.
-
-### Issue 2: Status Type Mismatch
-The allocations insert uses `status: 'scheduled' as AllocationStatus` but this casting happens inside the object, which could cause issues.
-
-### Issue 3: Insufficient Request Check
-The "Merge Selected" button appears when 2+ requests are selected, but doesn't account for the case when there's literally only 1 pending request in the system.
+## Overview
+Create a Trip Schedule module that provides calendar/list views of scheduled trips. This serves two audiences:
+- **Drivers**: View their assigned trips and manage trip execution (start/complete)
+- **Coordinators/Admins**: View all scheduled trips across the fleet with filtering options
 
 ---
 
-## Solution
+## Features
 
-### 1. Improve MergeRequestsDialog with Better Validation
+### 1. Schedule Views
+| View | Description |
+|------|-------------|
+| Day View | All trips for a selected date (default: today) |
+| Week View | 7-day overview with trip counts |
+| List View | Filterable table of upcoming trips |
 
-Add proper validation feedback and fix the submit flow:
+### 2. Filtering Options
+- Date/Date Range picker
+- Driver filter (coordinators only)
+- Vehicle filter (coordinators only)
+- Status filter (scheduled, dispatched, in_progress)
 
-```typescript
-const handleSubmit = async () => {
-  // Add validation with feedback
-  if (requests.length < 2) {
-    toast.error('Need at least 2 requests to merge');
-    return;
-  }
-  if (!vehicleId) {
-    toast.error('Please select a vehicle');
-    return;
-  }
-  if (!driverId) {
-    toast.error('Please select a driver');
-    return;
-  }
-  if (!compatibility.compatible) {
-    toast.error(compatibility.reason || 'Requests are not compatible');
-    return;
-  }
+### 3. Driver-Specific Features
+- "My Trips" toggle showing only assigned trips
+- Quick actions: Start Trip, Complete Trip
+- Mobile-responsive card layout for use on the go
 
-  try {
-    await createTripPool.mutateAsync({...});
-    onOpenChange(false);
-  } catch (error) {
-    // Error is already handled by mutation's onError
-  }
-};
-```
+### 4. Trip Cards Display
+Each trip card shows:
+- Time and status
+- Pickup and dropoff locations
+- Passenger count
+- Vehicle and driver info
+- Pool indicator (if part of a pooled trip)
 
-### 2. Fix Allocations Page to Show Feedback
+---
 
-Add a message when there aren't enough pending requests to merge:
+## Files to Create
 
-```typescript
-{activeTab === 'pending' && pendingRequests.length < 2 && pendingRequests.length > 0 && (
-  <p className="text-sm text-muted-foreground ml-auto">
-    Need 2+ requests to merge
-  </p>
-)}
-```
-
-### 3. Add Toast Import to MergeRequestsDialog
-
-```typescript
-import { toast } from 'sonner';
-```
+| File | Purpose |
+|------|---------|
+| `src/pages/TripSchedule.tsx` | Main page with views and filters |
+| `src/hooks/useTripSchedule.ts` | Data fetching with date/filter params |
+| `src/components/trips/TripCard.tsx` | Reusable trip display card |
+| `src/components/trips/DayView.tsx` | Single day schedule view |
+| `src/components/trips/WeekView.tsx` | Weekly overview |
+| `src/components/trips/ScheduleFilters.tsx` | Filter controls component |
 
 ---
 
@@ -85,27 +55,164 @@ import { toast } from 'sonner';
 
 | File | Changes |
 |------|---------|
-| `src/components/allocations/MergeRequestsDialog.tsx` | Add validation feedback, toast messages, better error handling |
-| `src/pages/Allocations.tsx` | Add message when not enough requests to merge |
+| `src/App.tsx` | Add `/trips` route |
+
+---
+
+## UI Layout
+
+### Page Structure
+```
++--------------------------------------------------+
+| Trip Schedule                    [Today] [Week]  |
++--------------------------------------------------+
+| Filters: [Date Picker] [Driver ▼] [Vehicle ▼]   |
+|          [x] Show my trips only (drivers)        |
++--------------------------------------------------+
+| Sunday, Feb 2, 2026                              |
++--------------------------------------------------+
+| ┌──────────────────────────────────────────────┐ |
+| │ 9:00 AM              DISPATCHED              │ |
+| │ HQ → Airport         TR-2026-0001            │ |
+| │ 2 passengers         Toyota Hiace ABC-1234   │ |
+| │ Driver: John Doe                             │ |
+| │                      [Start Trip]            │ |
+| └──────────────────────────────────────────────┘ |
+|                                                  |
+| ┌──────────────────────────────────────────────┐ |
+| │ 10:30 AM             SCHEDULED     [POOLED]  │ |
+| │ Downtown → Hospital  POOL-2026-0001          │ |
+| │ 4 passengers (2 requests)                    │ |
+| │ Vehicle: XYZ-5678    Driver: Jane Smith      │ |
+| └──────────────────────────────────────────────┘ |
++--------------------------------------------------+
+```
+
+### Week View
+```
++--------------------------------------------------+
+|        Mon   Tue   Wed   Thu   Fri   Sat   Sun   |
+| 2/3   [4]   [2]   [5]   [3]   [1]   [-]   [-]   |
++--------------------------------------------------+
+| Click a day to see details                       |
++--------------------------------------------------+
+```
 
 ---
 
 ## Implementation Details
 
-### MergeRequestsDialog Changes
-- Add `import { toast } from 'sonner'`
-- Update `handleSubmit` with explicit validation messages
-- Wrap mutation call in try-catch (even though mutation has onError)
-- Only close dialog on success
+### useTripSchedule Hook
+```typescript
+interface TripScheduleFilters {
+  date?: string;         // Single date filter
+  startDate?: string;    // Range start
+  endDate?: string;      // Range end
+  driverId?: string;     // Filter by driver
+  vehicleId?: string;    // Filter by vehicle
+  myTripsOnly?: boolean; // For drivers
+  status?: string[];     // Status filter
+}
 
-### Allocations Page Changes
-- Show helper text when only 1 request is pending
-- Disable merge button with tooltip explaining why
+export function useTripSchedule(filters: TripScheduleFilters) {
+  // Fetch allocations with related data
+  // Filter by date range
+  // Include pool information
+  // Return grouped by date for display
+}
+```
+
+### Data Structure for Display
+```typescript
+interface ScheduledTrip {
+  id: string;
+  type: 'single' | 'pooled';
+  scheduledTime: string;
+  status: AllocationStatus;
+  pickup: string;
+  dropoff: string;
+  passengerCount: number;
+  vehicle: { registration: string; makeModel: string };
+  driver: { name: string; id: string };
+  request?: { number: string; requester: string };
+  pool?: { number: string; requestCount: number };
+  canStartTrip: boolean;
+  canCompleteTrip: boolean;
+}
+
+interface DaySchedule {
+  date: string;
+  trips: ScheduledTrip[];
+}
+```
 
 ---
 
-## Testing Checklist
-1. Create 2+ approved requests with same date and close pickup times
-2. Try merging them - should work
-3. Try merging requests on different dates - should show clear error
-4. Try submitting without vehicle/driver - should show validation error
+## Role-Based Access
+
+### Drivers
+- See only their assigned trips by default
+- Can toggle "Show all trips" (read-only view)
+- Can start/complete their own trips
+- Mobile-optimized card view
+
+### Coordinators/Admins
+- See all trips across the fleet
+- Can filter by any driver or vehicle
+- Full access to all trip management actions
+- Access to week view and reporting
+
+---
+
+## Integration Points
+
+### With TripTrackingDialog
+Reuse the existing `TripTrackingDialog` component for Start Trip and Complete Trip actions directly from the schedule.
+
+### With Allocations
+- Schedule shows data from `allocations` table
+- Links to allocation detail when needed
+- Status updates sync with allocations module
+
+---
+
+## Implementation Order
+
+### Phase 1: Core Page and Hook
+1. Create `useTripSchedule.ts` hook with date filtering
+2. Create `TripSchedule.tsx` page with day view
+3. Add route to `App.tsx`
+
+### Phase 2: Components
+1. Create `TripCard.tsx` for consistent trip display
+2. Create `ScheduleFilters.tsx` for filter controls
+3. Create `DayView.tsx` component
+
+### Phase 3: Enhanced Views
+1. Create `WeekView.tsx` with week overview
+2. Add driver/vehicle filtering
+3. Add "My trips only" toggle for drivers
+
+### Phase 4: Trip Actions
+1. Integrate `TripTrackingDialog` for start/complete
+2. Add status update actions
+3. Mobile optimization
+
+---
+
+## Mobile Considerations
+
+- Stack trip cards vertically
+- Large touch targets for Start/Complete buttons
+- Swipe gestures for day navigation (future)
+- Bottom sheet for filters on mobile
+
+---
+
+## Stats Display
+
+Show summary stats at top of page:
+- Trips today: X
+- In progress: X
+- Completed: X
+- Upcoming this week: X
