@@ -84,7 +84,7 @@ export function useFormLinks() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('public_form_links')
-        .select('*')
+        .select('*, department:departments(id, name, code)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -99,6 +99,7 @@ export function useCreateFormLink() {
       name: string;
       description?: string;
       default_approver_id?: string;
+      department_id?: string;
       expires_at?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();

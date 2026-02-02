@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import { useCreateFormLink } from '@/hooks/usePublicRequest';
 import { useUsers } from '@/hooks/useUsers';
+import { useDepartments } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -40,6 +41,7 @@ import { cn } from '@/lib/utils';
 const formSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   description: z.string().optional(),
+  department_id: z.string().optional(),
   default_approver_id: z.string().optional(),
   expires_at: z.date().optional(),
 });
@@ -55,6 +57,7 @@ export function CreateFormLinkDialog({ open, onOpenChange }: CreateFormLinkDialo
   const createMutation = useCreateFormLink();
   const queryClient = useQueryClient();
   const { data: users } = useUsers();
+  const { data: departments } = useDepartments();
 
   // Filter users with approver or admin roles
   const approvers = users?.filter(user => 
@@ -66,6 +69,7 @@ export function CreateFormLinkDialog({ open, onOpenChange }: CreateFormLinkDialo
     defaultValues: {
       name: '',
       description: '',
+      department_id: undefined,
       default_approver_id: undefined,
       expires_at: undefined,
     },
@@ -75,6 +79,7 @@ export function CreateFormLinkDialog({ open, onOpenChange }: CreateFormLinkDialo
     await createMutation.mutateAsync({
       name: values.name,
       description: values.description || undefined,
+      department_id: values.department_id === 'none' ? undefined : values.department_id,
       default_approver_id: values.default_approver_id === 'none' ? undefined : values.default_approver_id,
       expires_at: values.expires_at?.toISOString(),
     });
@@ -124,6 +129,38 @@ export function CreateFormLinkDialog({ open, onOpenChange }: CreateFormLinkDialo
                       {...field} 
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="department_id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Department</FormLabel>
+                  <Select 
+                    onValueChange={(val) => field.onChange(val === "none" ? undefined : val)} 
+                    value={field.value || "none"}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">No department</SelectItem>
+                      {departments?.filter(d => d.is_active).map((dept) => (
+                        <SelectItem key={dept.id} value={dept.id}>
+                          {dept.name} {dept.code && `(${dept.code})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Associate this form link with a department.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

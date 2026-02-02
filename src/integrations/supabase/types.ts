@@ -364,6 +364,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           default_approver_id: string | null
+          department_id: string | null
           description: string | null
           expires_at: string | null
           id: string
@@ -376,6 +377,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           default_approver_id?: string | null
+          department_id?: string | null
           description?: string | null
           expires_at?: string | null
           id?: string
@@ -388,6 +390,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           default_approver_id?: string | null
+          department_id?: string | null
           description?: string | null
           expires_at?: string | null
           id?: string
@@ -396,7 +399,15 @@ export type Database = {
           submission_count?: number | null
           token?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "public_form_links_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       request_history: {
         Row: {
