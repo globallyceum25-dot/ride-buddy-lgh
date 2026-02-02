@@ -29,6 +29,8 @@ interface AllocationCardProps {
   onCancel?: () => void;
   onDispatch?: () => void;
   isDragging?: boolean;
+  /** When true, card is rendered inside a PoolGroup - hides individual pool banner and uses reduced spacing */
+  isGrouped?: boolean;
 }
 
 const priorityStyles: Record<string, string> = {
@@ -44,6 +46,7 @@ export function AllocationCard({
   onCancel,
   onDispatch,
   isDragging = false,
+  isGrouped = false,
 }: AllocationCardProps) {
   const {
     attributes,
@@ -74,17 +77,19 @@ export function AllocationCard({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'bg-card rounded-lg border shadow-sm p-3 cursor-grab active:cursor-grabbing',
+        'bg-card rounded-lg border shadow-sm cursor-grab active:cursor-grabbing',
         'transition-all duration-200 hover:shadow-md',
         priorityStyles[priority],
-        isPooled && 'ring-2 ring-accent ring-offset-1 bg-gradient-to-br from-accent/30 to-card',
+        // Grouped cards have reduced padding, standalone pooled cards have accent styling
+        isGrouped ? 'p-2' : 'p-3',
+        isPooled && !isGrouped && 'ring-2 ring-accent ring-offset-1 bg-gradient-to-br from-accent/30 to-card',
         isCurrentlyDragging && 'opacity-50 shadow-lg scale-105 rotate-2 z-50'
       )}
       {...attributes}
       {...listeners}
     >
-      {/* Pooled Indicator Banner */}
-      {isPooled && (
+      {/* Pooled Indicator Banner - only show for standalone pooled cards, not grouped ones */}
+      {isPooled && !isGrouped && (
         <div className="flex items-center gap-1.5 mb-2 -mt-1 -mx-1 px-2 py-1 bg-accent rounded-t text-accent-foreground text-xs font-medium">
           <Users className="h-3 w-3" />
           <span>Pooled Trip</span>

@@ -163,7 +163,8 @@ export function useAllocations(filters?: { status?: AllocationStatus; date?: str
             pickup_datetime, passenger_count, priority, status, requester_id
           ),
           vehicle:vehicles(id, registration_number, make, model, capacity, odometer),
-          driver:drivers(id, user_id, license_number)
+          driver:drivers(id, user_id, license_number),
+          pool:trip_pools(pool_number)
         `)
         .order('scheduled_pickup', { ascending: true });
       
