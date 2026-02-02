@@ -30,6 +30,7 @@ const formSchema = z.object({
   request_prefix: z.string().min(1, 'Request prefix is required'),
   default_location_id: z.string().optional(),
   date_format: z.string().default('DD/MM/YYYY'),
+  published_domain: z.string().url('Must be a valid URL').optional().or(z.literal('')),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -46,6 +47,7 @@ export function GeneralSettings() {
       request_prefix: 'TR-',
       default_location_id: '',
       date_format: 'DD/MM/YYYY',
+      published_domain: '',
     },
   });
 
@@ -59,6 +61,7 @@ export function GeneralSettings() {
           request_prefix: value.request_prefix || 'TR-',
           default_location_id: value.default_location_id || '',
           date_format: value.date_format || 'DD/MM/YYYY',
+          published_domain: value.published_domain || '',
         });
       }
     }
@@ -175,6 +178,22 @@ export function GeneralSettings() {
                   </Select>
                   <FormDescription>
                     How dates are displayed throughout the system
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="published_domain"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Published Domain</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., https://yourdomain.com" {...field} />
+                  </FormControl>
+                  <FormDescription>
+                    The public domain used for shareable form links. Leave empty to use the default.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
