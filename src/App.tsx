@@ -19,6 +19,7 @@ import Requests from "./pages/Requests";
 import Approvals from "./pages/Approvals";
 import Allocations from "./pages/Allocations";
 import TripSchedule from "./pages/TripSchedule";
+import Reports from "./pages/Reports";
 
 const queryClient = new QueryClient();
 
@@ -112,6 +113,16 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={['driver', 'group_admin', 'location_coordinator']}>
                   <TripSchedule />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Reports - Coordinators and Admins */}
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
+                  <Reports />
                 </ProtectedRoute>
               }
             />
