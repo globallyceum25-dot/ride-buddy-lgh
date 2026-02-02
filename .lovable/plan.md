@@ -1,157 +1,225 @@
 
-# Link Public Form Links to Departments
+
+# Modern Calendar View for Trip Schedule
 
 ## Overview
 
-This feature will allow administrators to associate each public form link with a specific department. When a guest submits a request through a public link, the department association will be carried over to the travel request.
+Transform the Trip Schedule page with a visually stunning, modern calendar interface featuring interactive views, smooth animations, and an improved user experience. The design will incorporate contemporary UI patterns while maintaining the clean corporate aesthetic.
 
 ## Current State
 
-- `public_form_links` table has no `department_id` column
-- Public form links can specify a default approver but not a department
-- Travel requests have a `cost_center` field (text) but rely on the requester's profile for department context
-- Departments are managed in Settings with `id`, `name`, `code`, and `is_active` fields
+- Basic Day/Week view toggle with simple card layout
+- Week view shows 7-column grid with trip counts
+- Day view shows TripCards in a vertical list
+- Standard date picker in a popover
+- Stats displayed in small cards at the top
+
+## Proposed Modern Calendar Features
+
+### 1. Full Month Calendar View
+
+A new full month view with:
+- Grid layout showing all days of the month
+- Trip indicators as colored dots/pills on each day
+- Click-to-select navigation to day view
+- Current day highlighted
+- Days with trips show visual density indicators
+
+### 2. Enhanced Week View with Timeline
+
+Replace the simple grid with a timeline-style view:
+- Horizontal timeline header with hours
+- Trips displayed as blocks on the timeline
+- Color-coded by status (scheduled, in progress, completed)
+- Hover cards showing trip details
+- Drag-to-scroll for timeline navigation
+
+### 3. Modern Navigation Header
+
+- Sleek month/year navigation with smooth transitions
+- Today button for quick navigation
+- Animated view switcher (Day/Week/Month)
+- Mini calendar dropdown for date jumping
+
+### 4. Trip Preview Cards
+
+- Hover-triggered preview popups on calendar events
+- Smooth scale-in animations
+- Quick action buttons visible on hover
+- Visual trip route indicator
+
+### 5. Visual Enhancements
+
+- Gradient backgrounds for selected dates
+- Status-based color coding throughout
+- Subtle shadows and depth
+- Smooth transitions between views
+- Loading skeletons with shimmer effect
 
 ## Implementation Plan
 
-### 1. Database Schema Update
+### Phase 1: New Month View Component
 
-Add a `department_id` column to the `public_form_links` table:
-
-| Column | Type | Description |
-|--------|------|-------------|
-| department_id | UUID (nullable) | Foreign key to departments table |
-
-### 2. Update Create Form Link Dialog
-
-Add a department selector in `CreateFormLinkDialog.tsx`:
+Create `src/components/trips/MonthView.tsx`:
 
 ```text
-+------------------------------------------+
-| Link Name *                              |
-| [HR Department Requests        ]         |
-+------------------------------------------+
-| Department                               |
-| [Select department           v]          |
-|   - General Secretariat                  |
-|   - Governance                           |
-|   - IT Pillar                            |
-+------------------------------------------+
-| Default Approver                         |
-| [Select an approver          v]          |
-+------------------------------------------+
-| Expiry Date                              |
-| [No expiry                   v]          |
-+------------------------------------------+
++--------------------------------------------------+
+|  < February 2026 >         [Day][Week][Month]    |
++--------------------------------------------------+
+| Mon | Tue | Wed | Thu | Fri | Sat | Sun          |
++-----+-----+-----+-----+-----+-----+-----+--------+
+|  26 |  27 |  28 |  29 |  30 |  31 |  1  |        |
+|     |     |     |     |  ** |     |     |        |
++-----+-----+-----+-----+-----+-----+-----+--------+
+|  2  |  3  |  4  |  5  |  6  |  7  |  8  |        |
+| *** | **  |     |  *  |     |     |     |        |
++-----+-----+-----+-----+-----+-----+-----+--------+
+|  9  | 10  | 11  | 12  | 13  | 14  | 15  |        |
+|     |  *  |     |     | *** |     |     |        |
++-----+-----+-----+-----+-----+-----+-----+--------+
+|     ... more rows ...                            |
++--------------------------------------------------+
+* = trip indicator (colored by status)
 ```
 
-### 3. Update Public Form Links Table Display
+### Phase 2: Enhanced Week Timeline View
 
-Show the associated department in the links table:
+Update `src/components/trips/WeekView.tsx`:
 
-| Name | Department | Link | Submissions | Expires | Status | Actions |
-|------|------------|------|-------------|---------|--------|---------|
+```text
++--------------------------------------------------+
+| Time  | Mon 2  | Tue 3  | Wed 4  | Thu 5  | ...  |
++-------+--------+--------+--------+--------+------+
+| 06:00 |        |        |        |        |      |
++-------+--------+--------+--------+--------+------+
+| 08:00 | [Trip] |        |        | [Trip] |      |
+|       | 09:00  |        |        | 08:30  |      |
++-------+--------+--------+--------+--------+------+
+| 10:00 |        | [Trip] |        |        |      |
+|       |        | 10:30  |        |        |      |
++-------+--------+--------+--------+--------+------+
+| 12:00 |        |        | [Trip] |        |      |
+|       |        |        | 12:00  |        |      |
++-------+--------+--------+--------+--------+------+
+```
 
-### 4. Update Hooks
+### Phase 3: Modern Navigation Component
 
-**`usePublicRequest.ts`:**
-- Add `department_id` to the create mutation input
-- Include department in form links query with join
+Create `src/components/trips/CalendarNavigation.tsx`:
 
-### 5. Update Edge Function (Optional Enhancement)
+- Sleek header with month/year display
+- Animated chevron buttons for navigation
+- View mode tabs with pill-style indicator
+- "Today" quick action button
+- Mini calendar popup for date jumping
 
-**`submit-public-request/index.ts`:**
-- Fetch the department name from the linked department
-- Store department info on the travel request (if department field exists) or in notes
+### Phase 4: Trip Preview Hover Card
 
-### 6. Update Travel Request Submission
+Create `src/components/trips/TripPreviewCard.tsx`:
 
-When a request is submitted via a public form link with a department, the department association can be:
-- Stored in a notes/metadata field on the request
-- Used for reporting and filtering purposes
+- Uses HoverCard component for smooth popup
+- Shows trip summary, route, and status
+- Quick action buttons for start/complete
+- Animated entrance with scale-in effect
 
-## Files to Modify
+### Phase 5: Update Main TripSchedule Page
 
-| File | Changes |
-|------|---------|
-| `supabase/migrations/` | Add `department_id` column to `public_form_links` |
-| `src/integrations/supabase/types.ts` | Auto-regenerated after migration |
-| `src/components/settings/CreateFormLinkDialog.tsx` | Add department selector |
-| `src/components/settings/PublicFormLinks.tsx` | Display department column |
-| `src/hooks/usePublicRequest.ts` | Include department in queries and mutations |
-| `supabase/functions/submit-public-request/index.ts` | Pass department to request (optional) |
+Integrate all components with:
+- View mode state (day/week/month)
+- Smooth transitions between views
+- Unified filtering across all views
+- Mobile-responsive layout adjustments
+
+## New Hooks
+
+### useMonthSchedule
+
+Fetch trip counts for entire month to populate calendar dots:
+
+```typescript
+export function useMonthSchedule(month: Date) {
+  // Returns: { [date: string]: { count: number; hasInProgress: boolean; hasCompleted: boolean } }
+}
+```
+
+## Files to Create/Modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/trips/MonthView.tsx` | Create | Full month calendar grid |
+| `src/components/trips/CalendarNavigation.tsx` | Create | Modern navigation header |
+| `src/components/trips/TripPreviewCard.tsx` | Create | Hover preview for trips |
+| `src/components/trips/WeekView.tsx` | Update | Enhanced timeline layout |
+| `src/hooks/useTripSchedule.ts` | Update | Add useMonthSchedule hook |
+| `src/pages/TripSchedule.tsx` | Update | Integrate new components |
+| `src/index.css` | Update | Add calendar-specific animations |
 
 ## Technical Details
 
-### Database Migration
-
-```sql
--- Add department_id to public_form_links
-ALTER TABLE public.public_form_links
-ADD COLUMN department_id UUID REFERENCES public.departments(id) ON DELETE SET NULL;
-
--- Add index for performance
-CREATE INDEX idx_public_form_links_department ON public.public_form_links(department_id);
-```
-
-### Form Link Query with Department
+### Month View Data Structure
 
 ```typescript
-const { data, error } = await supabase
-  .from('public_form_links')
-  .select('*, department:departments(id, name, code)')
-  .order('created_at', { ascending: false });
+interface MonthDay {
+  date: string;
+  dayNumber: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  isSelected: boolean;
+  trips: {
+    total: number;
+    scheduled: number;
+    inProgress: number;
+    completed: number;
+  };
+}
 ```
 
-### Create Form Link with Department
+### View Transition Animation
 
-```typescript
-await supabase.from('public_form_links').insert({
-  name: values.name,
-  description: values.description,
-  default_approver_id: values.default_approver_id,
-  department_id: values.department_id, // NEW
-  expires_at: values.expires_at,
-  created_by: user.id,
-});
+```css
+.calendar-view-enter {
+  opacity: 0;
+  transform: translateX(20px);
+}
+.calendar-view-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: all 0.3s ease-out;
+}
 ```
 
-### UI Component Update (CreateFormLinkDialog)
+### Status Color Palette
 
-```typescript
-// Add department field to form schema
-department_id: z.string().optional(),
+| Status | Color | CSS Variable |
+|--------|-------|--------------|
+| Scheduled | Blue | `--info` |
+| Dispatched | Amber | `--warning` |
+| In Progress | Purple | `--primary` |
+| Completed | Green | `--success` |
 
-// Add departments query
-const { data: departments } = useDepartments();
+### Month Calendar Dot Indicators
 
-// Add department selector in form
-<FormField
-  name="department_id"
-  render={({ field }) => (
-    <FormItem>
-      <FormLabel>Department</FormLabel>
-      <Select onValueChange={field.onChange} value={field.value}>
-        <SelectTrigger>
-          <SelectValue placeholder="Select department" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none">No department</SelectItem>
-          {departments?.filter(d => d.is_active).map(dept => (
-            <SelectItem key={dept.id} value={dept.id}>
-              {dept.name} {dept.code && `(${dept.code})`}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </FormItem>
-  )}
-/>
+```tsx
+// Dots under each day number
+<div className="flex gap-0.5 justify-center mt-1">
+  {trips.scheduled > 0 && <div className="w-1.5 h-1.5 rounded-full bg-info" />}
+  {trips.inProgress > 0 && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
+  {trips.completed > 0 && <div className="w-1.5 h-1.5 rounded-full bg-success" />}
+</div>
 ```
 
-## Benefits
+## Mobile Responsiveness
 
-1. **Better Organization**: Links can be categorized by department
-2. **Reporting**: Filter and analyze requests by department
-3. **Access Control**: Future enhancement to restrict approvers by department
-4. **Clarity**: Admins can quickly see which department each link serves
+- Month view: Full width, compact day cells
+- Week view: Scrollable horizontally on small screens
+- Day view: Card-based layout maintained
+- Navigation: Simplified controls on mobile
+- View switcher: Icon-only on small screens
+
+## Accessibility
+
+- Keyboard navigation for date selection
+- ARIA labels for calendar cells
+- Focus indicators on interactive elements
+- Screen reader announcements for date changes
+
