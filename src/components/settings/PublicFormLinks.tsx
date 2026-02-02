@@ -41,7 +41,7 @@ export function PublicFormLinks() {
   }, [settings]);
 
   const getPublicUrl = (token: string) => {
-    return `${publishedDomain}/request/${token}`;
+    return `${publishedDomain}/#/request/${token}`;
   };
 
   const copyToClipboard = (token: string) => {
