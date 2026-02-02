@@ -359,6 +359,45 @@ export type Database = {
         }
         Relationships: []
       }
+      public_form_links: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          default_approver_id: string | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          submission_count: number | null
+          token: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          default_approver_id?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          submission_count?: number | null
+          token?: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          default_approver_id?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          submission_count?: number | null
+          token?: string
+        }
+        Relationships: []
+      }
       request_history: {
         Row: {
           action: string
@@ -467,7 +506,12 @@ export type Database = {
           cost_center: string | null
           created_at: string
           dropoff_location: string
+          form_link_id: string | null
+          guest_email: string | null
+          guest_name: string | null
+          guest_phone: string | null
           id: string
+          is_guest_request: boolean | null
           notes: string | null
           passenger_count: number
           pickup_datetime: string
@@ -490,7 +534,12 @@ export type Database = {
           cost_center?: string | null
           created_at?: string
           dropoff_location: string
+          form_link_id?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
           id?: string
+          is_guest_request?: boolean | null
           notes?: string | null
           passenger_count?: number
           pickup_datetime: string
@@ -513,7 +562,12 @@ export type Database = {
           cost_center?: string | null
           created_at?: string
           dropoff_location?: string
+          form_link_id?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
           id?: string
+          is_guest_request?: boolean | null
           notes?: string | null
           passenger_count?: number
           pickup_datetime?: string
@@ -529,7 +583,15 @@ export type Database = {
           trip_type?: Database["public"]["Enums"]["trip_type"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "travel_requests_form_link_id_fkey"
+            columns: ["form_link_id"]
+            isOneToOne: false
+            referencedRelation: "public_form_links"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       trip_pools: {
         Row: {
@@ -740,6 +802,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_form_submissions: {
+        Args: { link_id: string }
+        Returns: undefined
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
