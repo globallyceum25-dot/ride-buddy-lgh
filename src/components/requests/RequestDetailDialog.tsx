@@ -16,7 +16,10 @@ import {
   Users, 
   User, 
   FileText,
-  AlertCircle 
+  AlertCircle,
+  Mail,
+  Phone,
+  BadgeCheck
 } from 'lucide-react';
 import { RequestStatusBadge } from './RequestStatusBadge';
 import { RequestPriorityBadge } from './RequestPriorityBadge';
@@ -192,6 +195,58 @@ export function RequestDetailDialog({
                   )}
                 </div>
               </div>
+
+              {/* Guest Information - shown for public form submissions */}
+              {request.is_guest_request && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Guest Information
+                    </h4>
+                    
+                    <div className="grid gap-3">
+                      <div className="flex items-start gap-3">
+                        <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium">Name</p>
+                          <p className="text-sm text-muted-foreground">{request.guest_name}</p>
+                        </div>
+                      </div>
+
+                      {request.guest_employee_id && (
+                        <div className="flex items-start gap-3">
+                          <BadgeCheck className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium">Employee ID</p>
+                            <p className="text-sm text-muted-foreground">{request.guest_employee_id}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {request.guest_email && (
+                        <div className="flex items-start gap-3">
+                          <Mail className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium">Email</p>
+                            <p className="text-sm text-muted-foreground">{request.guest_email}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {request.guest_phone && (
+                        <div className="flex items-start gap-3">
+                          <Phone className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium">Phone</p>
+                            <p className="text-sm text-muted-foreground">{request.guest_phone}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {/* Passengers List */}
               {passengers.length > 0 && (
