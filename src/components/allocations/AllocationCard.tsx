@@ -1,10 +1,15 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
-import { Car, Clock, MapPin, User, MoreHorizontal, Play, CheckCircle, X } from 'lucide-react';
+import { Car, Clock, MapPin, User, MoreHorizontal, Play, CheckCircle, X, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +67,7 @@ export function AllocationCard({
 
   const priority = allocation.request?.priority || 'normal';
   const isCurrentlyDragging = isDragging || isSortableDragging;
+  const isPooled = !!allocation.pool_id;
 
   return (
     <div
@@ -71,24 +77,33 @@ export function AllocationCard({
         'bg-card rounded-lg border shadow-sm p-3 cursor-grab active:cursor-grabbing',
         'transition-all duration-200 hover:shadow-md',
         priorityStyles[priority],
+        isPooled && 'ring-2 ring-accent ring-offset-1 bg-gradient-to-br from-accent/30 to-card',
         isCurrentlyDragging && 'opacity-50 shadow-lg scale-105 rotate-2 z-50'
       )}
       {...attributes}
       {...listeners}
     >
+      {/* Pooled Indicator Banner */}
+      {isPooled && (
+        <div className="flex items-center gap-1.5 mb-2 -mt-1 -mx-1 px-2 py-1 bg-accent rounded-t text-accent-foreground text-xs font-medium">
+          <Users className="h-3 w-3" />
+          <span>Pooled Trip</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
-        <div>
+        <div className="flex items-center flex-wrap gap-1">
           <span className="font-semibold text-sm">
             {allocation.request?.request_number}
           </span>
           {priority === 'vip' && (
-            <Badge variant="destructive" className="ml-2 text-xs">
+            <Badge variant="destructive" className="text-xs">
               VIP
             </Badge>
           )}
           {priority === 'urgent' && (
-            <Badge className="ml-2 text-xs bg-warning text-warning-foreground">
+            <Badge className="text-xs bg-warning text-warning-foreground">
               Urgent
             </Badge>
           )}
@@ -148,9 +163,32 @@ export function AllocationCard({
           <p className="truncate font-medium">
             {allocation.request?.pickup_location}
           </p>
-          <p className="truncate text-muted-foreground">
-            → {allocation.request?.dropoff_location}
-          </p>
+          {allocation.stops && allocation.stops.length > 0 ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p className="truncate text-muted-foreground cursor-help">
+                  <span className="inline-flex items-center gap-1">
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                      +{allocation.stops.length} stops
+                    </Badge>
+                  </span>
+                  → {allocation.request?.dropoff_location}
+                </p>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[200px]">
+                <p className="font-medium mb-1">Intermediate stops:</p>
+                <ol className="list-decimal list-inside text-xs space-y-0.5">
+                  {allocation.stops.map((stop, idx) => (
+                    <li key={idx} className="truncate">{stop.location}</li>
+                  ))}
+                </ol>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <p className="truncate text-muted-foreground">
+              → {allocation.request?.dropoff_location}
+            </p>
+          )}
         </div>
       </div>
 
