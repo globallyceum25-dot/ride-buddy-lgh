@@ -14,6 +14,95 @@ export type Database = {
   }
   public: {
     Tables: {
+      allocations: {
+        Row: {
+          actual_dropoff: string | null
+          actual_pickup: string | null
+          allocated_at: string | null
+          allocated_by: string | null
+          created_at: string | null
+          driver_id: string | null
+          id: string
+          notes: string | null
+          odometer_end: number | null
+          odometer_start: number | null
+          pool_id: string | null
+          request_id: string
+          scheduled_dropoff: string | null
+          scheduled_pickup: string
+          status: Database["public"]["Enums"]["allocation_status"] | null
+          updated_at: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          actual_dropoff?: string | null
+          actual_pickup?: string | null
+          allocated_at?: string | null
+          allocated_by?: string | null
+          created_at?: string | null
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          odometer_end?: number | null
+          odometer_start?: number | null
+          pool_id?: string | null
+          request_id: string
+          scheduled_dropoff?: string | null
+          scheduled_pickup: string
+          status?: Database["public"]["Enums"]["allocation_status"] | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          actual_dropoff?: string | null
+          actual_pickup?: string | null
+          allocated_at?: string | null
+          allocated_by?: string | null
+          created_at?: string | null
+          driver_id?: string | null
+          id?: string
+          notes?: string | null
+          odometer_end?: number | null
+          odometer_start?: number | null
+          pool_id?: string | null
+          request_id?: string
+          scheduled_dropoff?: string | null
+          scheduled_pickup?: string
+          status?: Database["public"]["Enums"]["allocation_status"] | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "allocations_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "allocations_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "trip_pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "allocations_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "travel_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "allocations_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -353,6 +442,66 @@ export type Database = {
         }
         Relationships: []
       }
+      trip_pools: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          driver_id: string | null
+          id: string
+          pool_number: string | null
+          route_summary: string | null
+          scheduled_date: string
+          scheduled_time: string
+          status: Database["public"]["Enums"]["pool_status"] | null
+          total_passengers: number | null
+          updated_at: string | null
+          vehicle_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          pool_number?: string | null
+          route_summary?: string | null
+          scheduled_date: string
+          scheduled_time: string
+          status?: Database["public"]["Enums"]["pool_status"] | null
+          total_passengers?: number | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          driver_id?: string | null
+          id?: string
+          pool_number?: string | null
+          route_summary?: string | null
+          scheduled_date?: string
+          scheduled_time?: string
+          status?: Database["public"]["Enums"]["pool_status"] | null
+          total_passengers?: number | null
+          updated_at?: string | null
+          vehicle_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_pools_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_pools_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_locations: {
         Row: {
           created_at: string
@@ -506,6 +655,12 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      allocation_status:
+        | "scheduled"
+        | "dispatched"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
       app_role:
         | "staff"
         | "driver"
@@ -516,6 +671,12 @@ export type Database = {
       fuel_type: "petrol" | "diesel" | "electric" | "hybrid" | "cng"
       license_type: "light" | "heavy" | "commercial"
       ownership_type: "owned" | "leased" | "rented"
+      pool_status:
+        | "pending"
+        | "confirmed"
+        | "dispatched"
+        | "completed"
+        | "cancelled"
       request_priority: "normal" | "urgent" | "vip"
       request_status:
         | "draft"
@@ -661,6 +822,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      allocation_status: [
+        "scheduled",
+        "dispatched",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
       app_role: [
         "staff",
         "driver",
@@ -672,6 +840,13 @@ export const Constants = {
       fuel_type: ["petrol", "diesel", "electric", "hybrid", "cng"],
       license_type: ["light", "heavy", "commercial"],
       ownership_type: ["owned", "leased", "rented"],
+      pool_status: [
+        "pending",
+        "confirmed",
+        "dispatched",
+        "completed",
+        "cancelled",
+      ],
       request_priority: ["normal", "urgent", "vip"],
       request_status: [
         "draft",

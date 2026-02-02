@@ -17,6 +17,7 @@ import Drivers from "./pages/Drivers";
 import Users from "./pages/Users";
 import Requests from "./pages/Requests";
 import Approvals from "./pages/Approvals";
+import Allocations from "./pages/Allocations";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,16 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
                   <Drivers />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Allocations - Admins and Coordinators */}
+            <Route
+              path="/allocations"
+              element={
+                <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
+                  <Allocations />
                 </ProtectedRoute>
               }
             />
