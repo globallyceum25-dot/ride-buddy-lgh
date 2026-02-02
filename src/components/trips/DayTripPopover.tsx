@@ -66,10 +66,16 @@ function TripPreviewRow({ trip }: { trip: MonthTripPreview }) {
 
 export function DayTripPopover({
   date,
-  trips,
+  trips = [],
   onSelectDate,
   children,
 }: DayTripPopoverProps) {
+  const tripCount = trips?.length ?? 0;
+  
+  if (tripCount === 0) {
+    return <>{children}</>;
+  }
+
   return (
     <HoverCard openDelay={300} closeDelay={150}>
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
@@ -78,7 +84,7 @@ export function DayTripPopover({
         <div className="p-3 border-b bg-muted/30">
           <h4 className="font-semibold">{format(date, 'EEEE, MMMM d')}</h4>
           <p className="text-xs text-muted-foreground">
-            {trips.length} scheduled trip{trips.length !== 1 ? 's' : ''}
+            {tripCount} scheduled trip{tripCount !== 1 ? 's' : ''}
           </p>
         </div>
 
@@ -89,9 +95,9 @@ export function DayTripPopover({
               <TripPreviewRow key={trip.id} trip={trip} />
             ))}
           </div>
-          {trips.length > 5 && (
+          {tripCount > 5 && (
             <div className="p-2 text-center text-sm text-muted-foreground border-t">
-              +{trips.length - 5} more trip{trips.length - 5 !== 1 ? 's' : ''}
+              +{tripCount - 5} more trip{tripCount - 5 !== 1 ? 's' : ''}
             </div>
           )}
         </ScrollArea>
