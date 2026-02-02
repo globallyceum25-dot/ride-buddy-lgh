@@ -31,6 +31,10 @@ interface AllocationCardProps {
   isDragging?: boolean;
   /** When true, card is rendered inside a PoolGroup - hides individual pool banner and uses reduced spacing */
   isGrouped?: boolean;
+  /** When true, this card's pool is being hovered - shows highlight effect */
+  isPoolHighlighted?: boolean;
+  /** Callback to set the hovered pool ID */
+  onPoolHover?: (poolId: string | null) => void;
 }
 
 const priorityStyles: Record<string, string> = {
@@ -47,6 +51,8 @@ export function AllocationCard({
   onDispatch,
   isDragging = false,
   isGrouped = false,
+  isPoolHighlighted = false,
+  onPoolHover,
 }: AllocationCardProps) {
   const {
     attributes,
@@ -72,6 +78,18 @@ export function AllocationCard({
   const isCurrentlyDragging = isDragging || isSortableDragging;
   const isPooled = !!allocation.pool_id;
 
+  const handleMouseEnter = () => {
+    if (isPooled && onPoolHover) {
+      onPoolHover(allocation.pool_id!);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (isPooled && onPoolHover) {
+      onPoolHover(null);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -83,8 +101,12 @@ export function AllocationCard({
         // Grouped cards have reduced padding, standalone pooled cards have accent styling
         isGrouped ? 'p-2' : 'p-3',
         isPooled && !isGrouped && 'ring-2 ring-accent ring-offset-1 bg-gradient-to-br from-accent/30 to-card',
-        isCurrentlyDragging && 'opacity-50 shadow-lg scale-105 rotate-2 z-50'
+        isCurrentlyDragging && 'opacity-50 shadow-lg scale-105 rotate-2 z-50',
+        // Pool highlight effect
+        isPoolHighlighted && !isCurrentlyDragging && 'ring-2 ring-primary shadow-lg bg-primary/5'
       )}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       {...attributes}
       {...listeners}
     >
