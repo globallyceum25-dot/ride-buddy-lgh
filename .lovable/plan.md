@@ -1,313 +1,387 @@
 
-
-# Move Pooled Trips Together
+# Update Dashboard with Real Data and Working Functions
 
 ## Overview
 
-When any card in a pooled trip is dragged to a different column, all other allocations in the same pool should automatically move to the same column. This ensures pooled trips remain synchronized since they share the same vehicle and driver.
+The current dashboard displays placeholder/static data with hardcoded "0" values. This plan transforms it into a functional, data-driven dashboard that shows live statistics from the database and provides working navigation and actions.
 
-## Current State
+## Current State Analysis
 
-- Individual cards can be dragged between columns
-- Pooled trips are visually grouped but move independently
-- `handleDragEnd` in `KanbanBoard.tsx` only updates the single dragged allocation
-- `useUpdateAllocationStatus` updates one allocation at a time
+The dashboard currently shows:
+- Static stats array with all "0" values
+- Non-functional "New Request" button
+- Placeholder alerts that don't reflect actual system state
+- Empty "Recent Activity" section
+- Empty "Today's Trips" for drivers
+- Empty "Pending Approvals" for approvers
 
-## Proposed Behavior
+## Proposed Changes
 
-When a pooled allocation is moved:
-1. Detect if the dragged allocation has a `pool_id`
-2. Find all other allocations in the same pool
-3. Validate the transition is valid for ALL allocations in the pool
-4. Update ALL allocations in the pool to the new status together
-5. If transition requires data (odometer), apply to all pooled allocations
+### 1. Create Dashboard Stats Hook
+
+Create a new hook `useDashboardStats` that fetches aggregate data:
 
 ```text
-BEFORE DRAG:                    AFTER DRAG:
-+----------+ +----------+       +----------+ +----------+
-| Pending  | |Dispatched|       | Pending  | |Dispatched|
-+----------+ +----------+       +----------+ +----------+
-| Pool A   |                    |          | | Pool A   |
-| ├ REQ-1  |  ← Drag REQ-1      |          | | ├ REQ-1  |
-| └ REQ-2  |    to Dispatched   |          | | └ REQ-2  |
-+----------+ +----------+       +----------+ +----------+
-
-Both REQ-1 and REQ-2 move together automatically
+┌─────────────────────────────────────────────────────────────────────┐
+│                       Dashboard Stats Sources                        │
+├─────────────────────────────────────────────────────────────────────┤
+│  Total Requests     ← travel_requests (count this month)            │
+│  Active Vehicles    ← vehicles where is_active=true & available     │
+│  Drivers on Duty    ← drivers with status='available' or 'on_trip'  │
+│  Today's Trips      ← allocations scheduled for today               │
+│  Pending Approvals  ← travel_requests with status='pending_approval'│
+│  Recent Activity    ← request_history (last 5 entries)              │
+│  Setup Alerts       ← Check if locations/vehicles/drivers exist     │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-## Implementation Plan
+### 2. Wire Up Navigation and Dialogs
 
-### Phase 1: Create Bulk Status Update Hook
+- "New Request" button → Opens `RequestDialog`
+- "New Transport Request" card → Opens `RequestDialog`
+- "View My Requests" card → Navigates to `/requests`
+- Pending approvals → Navigate to `/approvals`
+- Setup alerts → Navigate to respective pages
 
-Add `useBulkUpdateAllocationStatus` hook to update multiple allocations at once:
+### 3. Display Real Data in Each Section
 
-```typescript
-export function useBulkUpdateAllocationStatus() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ ids, status, ...updates }: { 
-      ids: string[]; 
-      status: AllocationStatus;
-      // ... other fields
-    }) => {
-      const { data, error } = await supabase
-        .from('allocations')
-        .update({ status, ...updates })
-        .in('id', ids)
-        .select();
-      
-      if (error) throw error;
-      
-      // Update associated request statuses
-      // Update vehicle odometer if completing
-      
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['allocations'] });
-      toast.success('Pool status updated');
-    },
-  });
-}
-```
+**Stats Grid (Admin view):**
+- Total Requests: Count of requests this month + % change from last month
+- Active Vehicles: Count of available vehicles / total active
+- Drivers on Duty: Count of available/on_trip drivers / total on leave
+- Today's Trips: Count of today's trips + completed count
 
-### Phase 2: Update KanbanBoard Drag Logic
+**Driver Section:**
+- Fetch today's trips assigned to current driver
+- Show trip cards with pickup time, route, status
 
-Modify `handleDragEnd` to detect pooled trips and move all together:
+**Approver Section:**
+- Fetch pending approvals count
+- Show first 3 pending with requester name and purpose
 
-```typescript
-const handleDragEnd = (event: DragEndEvent) => {
-  const { active, over } = event;
-  // ... existing validation ...
-  
-  const activeAllocation = findAllocation(activeId);
-  
-  // Check if this is a pooled trip
-  if (activeAllocation.pool_id) {
-    // Find all allocations in the same pool
-    const poolAllocations = filteredAllocations.filter(
-      a => a.pool_id === activeAllocation.pool_id
-    );
-    
-    // Validate transition for all
-    const allValid = poolAllocations.every(
-      a => a.status === activeAllocation.status
-    );
-    
-    if (!allValid) {
-      toast.error('Pool allocations have mixed statuses');
-      return;
-    }
-    
-    // Move all together
-    const allIds = poolAllocations.map(a => a.id);
-    
-    if (requiresData(targetStatus)) {
-      // Set state for bulk update with odometer
-      setTrackingPool({ allocations: poolAllocations, targetStatus });
-      return;
-    }
-    
-    bulkUpdateStatus.mutate({ ids: allIds, status: targetStatus });
-  } else {
-    // Existing single allocation update
-    updateStatus.mutate({ id: activeId, status: targetStatus });
-  }
-};
-```
+**Recent Activity:**
+- Fetch last 5 request_history entries
+- Show timestamp, action, and request number
 
-### Phase 3: Update Tracking Dialog for Pools
+**Alerts Section:**
+- Dynamic based on actual data:
+  - "No locations configured" if locations count = 0
+  - "No vehicles registered" if vehicles count = 0
+  - "No driver profiles" if drivers count = 0
+  - Expiring documents (insurance, license, registration within 30 days)
 
-Modify `TripTrackingDialog` to handle multiple allocations:
+## Technical Implementation
+
+### Phase 1: Create Dashboard Hook
+
+File: `src/hooks/useDashboardData.ts`
 
 ```typescript
-interface TripTrackingDialogProps {
-  allocation: Allocation | null;
-  poolAllocations?: Allocation[];  // NEW: For bulk updates
-  // ...
+interface DashboardStats {
+  totalRequests: number;
+  requestsChange: number; // % change from last month
+  activeVehicles: number;
+  availableVehicles: number;
+  driversOnDuty: number;
+  driversOnLeave: number;
+  todaysTrips: number;
+  completedToday: number;
 }
 
-// Submit handler updates all allocations in pool
-const handleTrackingSubmit = (data) => {
-  if (trackingPool) {
-    const allIds = trackingPool.allocations.map(a => a.id);
-    bulkUpdateStatus.mutate({
-      ids: allIds,
-      status: trackingPool.targetStatus,
-      ...data,
-    });
-  } else if (trackingAllocation) {
-    updateStatus.mutate({ id: trackingAllocation.id, ... });
-  }
-};
+interface SetupAlert {
+  type: 'setup' | 'warning' | 'urgent';
+  message: string;
+  link: string;
+}
+
+interface RecentActivityItem {
+  id: string;
+  action: string;
+  requestNumber: string;
+  timestamp: string;
+}
+
+interface PendingApprovalItem {
+  id: string;
+  requestNumber: string;
+  requesterName: string;
+  purpose: string;
+  createdAt: string;
+}
+
+interface DriverTripItem {
+  id: string;
+  scheduledTime: string;
+  pickup: string;
+  dropoff: string;
+  status: string;
+  passengerCount: number;
+}
+
+export function useDashboardStats()
+export function useSetupAlerts()
+export function useRecentActivity(limit: number)
+export function usePendingApprovalsPreview(limit: number)
+export function useDriverTodayTrips()
 ```
 
-## Files to Modify
+### Phase 2: Update Dashboard Component
+
+Modify `src/pages/Dashboard.tsx`:
+
+1. Import new hooks and RequestDialog component
+2. Replace static `stats` array with data from `useDashboardStats()`
+3. Add `useState` for dialog open state
+4. Wire up button click handlers
+5. Replace placeholder content with real data rendering
+6. Add loading skeletons for async data
+
+### Files to Create/Modify
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/hooks/useAllocations.ts` | Update | Add `useBulkUpdateAllocationStatus` hook |
-| `src/components/allocations/KanbanBoard.tsx` | Update | Modify drag handler to move pools together |
-| `src/components/allocations/TripTrackingDialog.tsx` | Update | Support bulk allocation updates |
+| `src/hooks/useDashboardData.ts` | Create | New hook for dashboard-specific queries |
+| `src/pages/Dashboard.tsx` | Update | Wire up real data and interactions |
 
-## Technical Details
+## Detailed Component Updates
 
-### Bulk Update Hook
-
-```typescript
-export function useBulkUpdateAllocationStatus() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ 
-      ids, 
-      status, 
-      vehicle_id,
-      ...updates 
-    }: { 
-      ids: string[]; 
-      status: AllocationStatus;
-      vehicle_id?: string | null;
-      actual_pickup?: string;
-      actual_dropoff?: string;
-      odometer_start?: number;
-      odometer_end?: number;
-    }) => {
-      // Update all allocations in the pool
-      const { data, error } = await supabase
-        .from('allocations')
-        .update({ status, ...updates })
-        .in('id', ids)
-        .select('id, request_id');
-      
-      if (error) throw error;
-      
-      // Update travel request statuses
-      const requestStatusMap: Record<AllocationStatus, string | null> = {
-        'dispatched': null,
-        'in_progress': 'in_progress',
-        'completed': 'completed',
-        'cancelled': null,
-        'scheduled': null,
-      };
-      
-      if (requestStatusMap[status] && data) {
-        const requestIds = data.map(a => a.request_id);
-        await supabase
-          .from('travel_requests')
-          .update({ status: requestStatusMap[status] })
-          .in('id', requestIds);
-      }
-      
-      // Update vehicle odometer when trip completes
-      if (status === 'completed' && updates.odometer_end && vehicle_id) {
-        await supabase
-          .from('vehicles')
-          .update({ odometer: updates.odometer_end })
-          .eq('id', vehicle_id);
-      }
-      
-      return data;
-    },
-    onSuccess: (_, { ids }) => {
-      queryClient.invalidateQueries({ queryKey: ['allocations'] });
-      queryClient.invalidateQueries({ queryKey: ['requests'] });
-      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-      toast.success(`Updated ${ids.length} allocations`);
-    },
-    onError: (error: Error) => {
-      toast.error(`Failed to update allocations: ${error.message}`);
-    },
-  });
-}
-```
-
-### Updated KanbanBoard State
+### Stats Grid with Real Data
 
 ```typescript
-// New state for tracking pool movements
-const [trackingPool, setTrackingPool] = useState<{
-  allocations: Allocation[];
-  targetStatus: AllocationStatus;
-} | null>(null);
+// Replace static stats with dynamic data
+const { data: stats, isLoading: statsLoading } = useDashboardStats();
 
-// Use bulk update hook
-const bulkUpdateStatus = useBulkUpdateAllocationStatus();
+const statsDisplay = [
+  {
+    label: 'Total Requests',
+    value: stats?.totalRequests || 0,
+    change: stats?.requestsChange 
+      ? `${stats.requestsChange > 0 ? '+' : ''}${stats.requestsChange}% from last month`
+      : 'This month',
+    icon: <FileText />,
+    color: 'text-primary',
+  },
+  // ... similar for other stats
+];
 ```
 
-### Modified Drag End Handler
+### New Request Button Integration
 
 ```typescript
-const handleDragEnd = (event: DragEndEvent) => {
-  const { active, over } = event;
-  setActiveId(null);
-  setOverId(null);
+const [requestDialogOpen, setRequestDialogOpen] = useState(false);
 
-  if (!over) return;
+// In render
+<Button onClick={() => setRequestDialogOpen(true)}>
+  <Plus className="mr-2 h-4 w-4" />
+  New Request
+</Button>
 
-  const activeId = active.id as string;
-  const activeAllocation = findAllocation(activeId);
-  if (!activeAllocation) return;
-
-  // Determine target column...
-  
-  // Skip if dropped in same column
-  if (activeAllocation.status === targetStatus) return;
-
-  // Validate transition
-  if (!isValidTransition(activeAllocation.status, targetStatus)) {
-    toast.error(`Cannot move directly to ${columns.find((c) => c.id === targetStatus)?.title}`);
-    return;
-  }
-
-  // Handle pooled trips - move all together
-  if (activeAllocation.pool_id) {
-    const poolAllocations = filteredAllocations.filter(
-      (a) => a.pool_id === activeAllocation.pool_id
-    );
-
-    // Verify all pool allocations are in the same status
-    const allSameStatus = poolAllocations.every(
-      (a) => a.status === activeAllocation.status
-    );
-    if (!allSameStatus) {
-      toast.error('Pool has allocations in different statuses');
-      return;
-    }
-
-    const allIds = poolAllocations.map((a) => a.id);
-
-    if (requiresData(targetStatus)) {
-      setTrackingPool({ allocations: poolAllocations, targetStatus });
-      return;
-    }
-
-    // Bulk update all pool allocations
-    bulkUpdateStatus.mutate({ ids: allIds, status: targetStatus });
-    toast.success(`Moved ${poolAllocations.length} pooled trips`);
-  } else {
-    // Single allocation update (existing logic)
-    if (requiresData(targetStatus)) {
-      // ... existing tracking dialog logic
-    } else {
-      updateStatus.mutate({ id: activeId, status: targetStatus });
-    }
-  }
-};
+<RequestDialog 
+  open={requestDialogOpen} 
+  onOpenChange={setRequestDialogOpen} 
+/>
 ```
 
-## User Experience
+### Quick Actions with Navigation
 
-- **Visual feedback**: When dragging a pooled card, show a badge indicating "Moving X trips"
-- **Toast message**: "Moved 3 pooled trips to Dispatched"
-- **Odometer entry**: Single odometer value applies to all trips in pool (shared vehicle)
-- **Validation**: Prevents moving if pool allocations are in mixed states
+```typescript
+import { useNavigate } from 'react-router-dom';
+
+const navigate = useNavigate();
+
+// New Transport Request card
+<Button 
+  variant="outline" 
+  onClick={() => setRequestDialogOpen(true)}
+>
+  <FileText className="mr-3 h-5 w-5 text-primary" />
+  <div className="text-left">
+    <div className="font-medium">New Transport Request</div>
+    <div className="text-xs text-muted-foreground">
+      Book a ride for yourself or team
+    </div>
+  </div>
+</Button>
+
+// View My Requests card
+<Button 
+  variant="outline" 
+  onClick={() => navigate('/requests')}
+>
+  ...
+</Button>
+```
+
+### Driver's Today Trips
+
+```typescript
+const { data: driverTrips, isLoading: tripsLoading } = useDriverTodayTrips();
+
+// Replace empty state with actual trips
+{tripsLoading ? (
+  <div className="space-y-2">
+    {[1, 2].map(i => <Skeleton key={i} className="h-16" />)}
+  </div>
+) : !driverTrips?.length ? (
+  <EmptyState />
+) : (
+  <div className="space-y-3">
+    {driverTrips.map(trip => (
+      <div key={trip.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+        <Badge variant={trip.status === 'dispatched' ? 'default' : 'secondary'}>
+          {format(new Date(trip.scheduledTime), 'HH:mm')}
+        </Badge>
+        <div className="flex-1">
+          <p className="text-sm font-medium">{trip.pickup} → {trip.dropoff}</p>
+          <p className="text-xs text-muted-foreground">
+            {trip.passengerCount} passenger(s)
+          </p>
+        </div>
+        <Badge variant="outline">{trip.status}</Badge>
+      </div>
+    ))}
+  </div>
+)}
+```
+
+### Pending Approvals Preview
+
+```typescript
+const { data: pendingApprovals } = usePendingApprovalsPreview(3);
+
+{pendingApprovals?.length ? (
+  <div className="space-y-3">
+    {pendingApprovals.map(approval => (
+      <div key={approval.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+        <div>
+          <p className="text-sm font-medium">{approval.requestNumber}</p>
+          <p className="text-xs text-muted-foreground">
+            {approval.requesterName} • {approval.purpose}
+          </p>
+        </div>
+        <Button size="sm" onClick={() => navigate('/approvals')}>
+          Review
+        </Button>
+      </div>
+    ))}
+    <Button variant="link" onClick={() => navigate('/approvals')}>
+      View all pending approvals →
+    </Button>
+  </div>
+) : (
+  <EmptyState message="No pending approvals" />
+)}
+```
+
+### Dynamic Setup Alerts
+
+```typescript
+const { data: alerts } = useSetupAlerts();
+
+{alerts?.length > 0 && (
+  <div className="space-y-3">
+    {alerts.map((alert, idx) => (
+      <div 
+        key={idx} 
+        className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted"
+        onClick={() => navigate(alert.link)}
+      >
+        <Badge variant="outline" className={cn(
+          alert.type === 'setup' && 'bg-warning/10 text-warning border-warning/20',
+          alert.type === 'warning' && 'bg-orange-100 text-orange-700',
+          alert.type === 'urgent' && 'bg-destructive/10 text-destructive'
+        )}>
+          {alert.type === 'setup' ? 'Setup' : alert.type === 'warning' ? 'Warning' : 'Urgent'}
+        </Badge>
+        <span className="text-sm">{alert.message}</span>
+      </div>
+    ))}
+  </div>
+)}
+```
+
+### Recent Activity
+
+```typescript
+const { data: recentActivity } = useRecentActivity(5);
+
+{recentActivity?.length ? (
+  <div className="space-y-3">
+    {recentActivity.map(activity => (
+      <div key={activity.id} className="flex items-start gap-3">
+        <div className="w-2 h-2 mt-2 rounded-full bg-primary" />
+        <div className="flex-1">
+          <p className="text-sm">{activity.action}</p>
+          <p className="text-xs text-muted-foreground">
+            {activity.requestNumber} • {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+          </p>
+        </div>
+      </div>
+    ))}
+  </div>
+) : (
+  <EmptyState />
+)}
+```
+
+## Database Queries Summary
+
+### Dashboard Stats Query
+```sql
+-- Total requests this month
+SELECT COUNT(*) FROM travel_requests 
+WHERE created_at >= date_trunc('month', now());
+
+-- Last month for comparison
+SELECT COUNT(*) FROM travel_requests 
+WHERE created_at >= date_trunc('month', now() - interval '1 month')
+AND created_at < date_trunc('month', now());
+
+-- Vehicles
+SELECT status, COUNT(*) FROM vehicles 
+WHERE is_active = true GROUP BY status;
+
+-- Drivers
+SELECT status, COUNT(*) FROM drivers 
+WHERE is_active = true GROUP BY status;
+
+-- Today's allocations
+SELECT status, COUNT(*) FROM allocations 
+WHERE scheduled_pickup::date = CURRENT_DATE 
+AND status != 'cancelled' GROUP BY status;
+```
+
+### Setup Alerts Query
+```sql
+-- Check for missing resources
+SELECT 
+  (SELECT COUNT(*) FROM locations WHERE is_active = true) as locations_count,
+  (SELECT COUNT(*) FROM vehicles WHERE is_active = true) as vehicles_count,
+  (SELECT COUNT(*) FROM drivers WHERE is_active = true) as drivers_count;
+
+-- Expiring documents (within 30 days)
+SELECT * FROM vehicles 
+WHERE is_active = true 
+AND (insurance_expiry < now() + interval '30 days' 
+  OR registration_expiry < now() + interval '30 days');
+
+SELECT d.*, p.full_name FROM drivers d
+JOIN profiles p ON d.user_id = p.user_id
+WHERE d.is_active = true 
+AND d.license_expiry < now() + interval '30 days';
+```
+
+## User Experience Improvements
+
+1. **Loading States**: Skeleton loaders while data fetches
+2. **Error Handling**: Toast notifications for failed queries
+3. **Empty States**: Helpful messages when no data exists
+4. **Click-through**: All cards/alerts navigate to relevant pages
+5. **Real-time Feel**: Use React Query's staleTime for fresh data
 
 ## Edge Cases Handled
 
-1. **Mixed statuses in pool**: Show error, prevent move
-2. **Individual card in pool**: Moves entire pool, not just the card
-3. **Odometer for pool**: One entry, applies to shared vehicle
-4. **Cancel in pool**: Each allocation can be cancelled individually (special case)
-
+- New users with no data: Show setup wizard prompts
+- Role-based visibility: Sections only show for appropriate roles
+- Zero counts: Display "0" gracefully with context
+- Error states: Fallback to empty state with retry option
