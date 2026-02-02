@@ -1,5 +1,7 @@
-import { Users } from 'lucide-react';
+import { useState } from 'react';
+import { Users, ChevronDown, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { AllocationCard } from './AllocationCard';
 import { Allocation } from '@/hooks/useAllocations';
 import { cn } from '@/lib/utils';
@@ -28,6 +30,8 @@ export function PoolGroup({
   onCancel,
   onDispatch,
 }: PoolGroupProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   const totalPassengers = allocations.reduce(
     (sum, a) => sum + (a.request?.passenger_count || 0),
     0
@@ -45,46 +49,82 @@ export function PoolGroup({
         'p-2'
       )}
     >
-      {/* Pool Header */}
+      {/* Pool Header - Clickable to toggle */}
       <div
         className={cn(
           'flex items-center justify-between',
-          'px-2 py-1.5 mb-2 rounded-md bg-accent/20'
+          'px-2 py-1.5 rounded-md bg-accent/20',
+          'cursor-pointer select-none hover:bg-accent/30 transition-colors',
+          !isCollapsed && 'mb-2'
         )}
+        onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 p-0 hover:bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCollapsed(!isCollapsed);
+            }}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4 text-accent-foreground" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-accent-foreground" />
+            )}
+          </Button>
           <Users className="h-4 w-4 text-accent" />
           <span className="font-medium text-sm text-accent-foreground">
             {poolNumber ? `Pool ${poolNumber}` : 'Pooled Trip'}
           </span>
+          {isCollapsed && (
+            <span className="text-xs text-muted-foreground">
+              ({allocations.length} trips)
+            </span>
+          )}
         </div>
         <Badge variant="secondary" className="text-xs">
           {totalPassengers} passengers
         </Badge>
       </div>
 
-      {/* Shared Resources Info */}
-      {(sharedVehicle || sharedDriver) && (
-        <div className="flex items-center gap-2 px-2 mb-2 text-xs text-muted-foreground">
+      {/* Collapsed Summary */}
+      {isCollapsed && (sharedVehicle || sharedDriver) && (
+        <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
           {sharedVehicle && <span>🚗 {sharedVehicle}</span>}
           {sharedDriver && <span>• {sharedDriver}</span>}
         </div>
       )}
 
-      {/* Grouped Cards */}
-      <div className="space-y-1.5">
-        {allocations.map((allocation) => (
-          <AllocationCard
-            key={allocation.id}
-            allocation={allocation}
-            isGrouped
-            onStartTrip={() => onStartTrip(allocation)}
-            onCompleteTrip={() => onCompleteTrip(allocation)}
-            onCancel={() => onCancel(allocation)}
-            onDispatch={() => onDispatch(allocation)}
-          />
-        ))}
-      </div>
+      {/* Expanded Content */}
+      {!isCollapsed && (
+        <>
+          {/* Shared Resources Info */}
+          {(sharedVehicle || sharedDriver) && (
+            <div className="flex items-center gap-2 px-2 mb-2 text-xs text-muted-foreground">
+              {sharedVehicle && <span>🚗 {sharedVehicle}</span>}
+              {sharedDriver && <span>• {sharedDriver}</span>}
+            </div>
+          )}
+
+          {/* Grouped Cards */}
+          <div className="space-y-1.5">
+            {allocations.map((allocation) => (
+              <AllocationCard
+                key={allocation.id}
+                allocation={allocation}
+                isGrouped
+                onStartTrip={() => onStartTrip(allocation)}
+                onCompleteTrip={() => onCompleteTrip(allocation)}
+                onCancel={() => onCancel(allocation)}
+                onDispatch={() => onDispatch(allocation)}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
