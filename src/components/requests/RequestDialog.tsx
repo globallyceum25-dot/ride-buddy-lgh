@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
 import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
-import { SortableStops } from './SortableStops';
+import { SortableStops } from '@/components/requests/SortableStops';
 import {
   Dialog,
   DialogContent,
