@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import { Calendar, Car, User, Users, AlertCircle, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Dialog,
   DialogContent,
@@ -103,21 +104,41 @@ export function MergeRequestsDialog({ open, onOpenChange, requests }: MergeReque
   }, [open, requests]);
   
   const handleSubmit = async () => {
-    if (!vehicleId || !driverId || requests.length < 2) return;
+    // Validation with feedback
+    if (requests.length < 2) {
+      toast.error('Need at least 2 requests to merge');
+      return;
+    }
+    if (!vehicleId) {
+      toast.error('Please select a vehicle');
+      return;
+    }
+    if (!driverId) {
+      toast.error('Please select a driver');
+      return;
+    }
+    if (!compatibility.compatible) {
+      toast.error(compatibility.reason || 'Requests are not compatible');
+      return;
+    }
     
-    // Get the scheduled date from the first request
-    const scheduledDate = format(new Date(requests[0].pickup_datetime), 'yyyy-MM-dd');
-    
-    await createTripPool.mutateAsync({
-      scheduled_date: scheduledDate,
-      scheduled_time: scheduledTime,
-      vehicle_id: vehicleId,
-      driver_id: driverId,
-      route_summary: routeSummary,
-      request_ids: requests.map(r => r.id),
-    });
-    
-    onOpenChange(false);
+    try {
+      // Get the scheduled date from the first request
+      const scheduledDate = format(new Date(requests[0].pickup_datetime), 'yyyy-MM-dd');
+      
+      await createTripPool.mutateAsync({
+        scheduled_date: scheduledDate,
+        scheduled_time: scheduledTime,
+        vehicle_id: vehicleId,
+        driver_id: driverId,
+        route_summary: routeSummary,
+        request_ids: requests.map(r => r.id),
+      });
+      
+      onOpenChange(false);
+    } catch (error) {
+      // Error is already handled by mutation's onError
+    }
   };
   
   if (requests.length === 0) return null;
