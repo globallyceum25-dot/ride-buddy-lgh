@@ -25,10 +25,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (!guestInfo.name || !guestInfo.email) {
-      console.error('Guest name and email are required');
+    if (!guestInfo.name || !guestInfo.email || !guestInfo.employee_id || !guestInfo.phone) {
+      console.error('Guest name, employee ID, email, and phone are required');
       return new Response(
-        JSON.stringify({ error: 'Guest name and email are required' }),
+        JSON.stringify({ error: 'Name, Employee ID, Email, and Phone are all required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -88,8 +88,9 @@ Deno.serve(async (req) => {
         special_requirements: requestData.special_requirements || null,
         notes: requestData.notes || null,
         guest_name: guestInfo.name,
+        guest_employee_id: guestInfo.employee_id,
         guest_email: guestInfo.email,
-        guest_phone: guestInfo.phone || null,
+        guest_phone: guestInfo.phone,
         form_link_id: formLink.id,
         is_guest_request: true,
         requester_id: formLink.created_by,

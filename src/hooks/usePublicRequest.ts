@@ -4,8 +4,9 @@ import { toast } from 'sonner';
 
 interface GuestInfo {
   name: string;
+  employee_id: string;
   email: string;
-  phone?: string;
+  phone: string;
 }
 
 interface RequestData {
