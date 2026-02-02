@@ -1,169 +1,250 @@
 
-# User Management Page - Implementation Plan
+# Travel Request Module - Implementation Plan
 
 ## Overview
-Create a comprehensive user management interface that allows Group Admins to create new user accounts, view all users, edit profiles, and manage role assignments.
+Build a complete travel request system where:
+- **Staff** can submit transport requests
+- **Approvers** (managers/HODs) review and approve/reject requests
+- **Location Coordinators** can view and allocate approved requests
+- All requests are tracked with full history and status updates
 
 ---
 
-## Architecture
+## Database Schema
 
-### Backend: Supabase Edge Function
-Since user creation requires the Admin API (service role key), we need an edge function to securely create users.
+### 1. New Enums
 
-**Function: `admin-create-user`**
-- Validates that the caller is a group_admin (using JWT verification)
-- Creates auth user with `supabase.auth.admin.createUser()`
-- The existing database trigger `handle_new_user` auto-creates the profile
-- Inserts role assignments to `user_roles` table
-- Optionally assigns primary location
+| Enum | Values |
+|------|--------|
+| `request_status` | `draft`, `pending_approval`, `approved`, `rejected`, `allocated`, `in_progress`, `completed`, `cancelled` |
+| `request_priority` | `normal`, `urgent`, `vip` |
+| `trip_type` | `one_way`, `round_trip`, `multi_stop` |
 
-### Frontend Components
+### 2. Travel Requests Table (`travel_requests`)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| request_number | text | Auto-generated reference (e.g., TR-2026-0001) |
+| requester_id | uuid | FK to profiles (who made request) |
+| status | request_status | Current status |
+| priority | request_priority | Normal/Urgent/VIP |
+| trip_type | trip_type | One-way/Round-trip/Multi-stop |
+| purpose | text | Business purpose |
+| passenger_count | integer | Number of passengers |
+| pickup_location | text | Free text or FK |
+| pickup_datetime | timestamptz | When to be picked up |
+| dropoff_location | text | Destination |
+| return_datetime | timestamptz | For round trips |
+| special_requirements | text | Accessibility, luggage, etc. |
+| cost_center | text | For billing |
+| approver_id | uuid | FK to profiles (assigned approver) |
+| approved_at | timestamptz | When approved |
+| approved_by | uuid | Who approved |
+| rejection_reason | text | If rejected |
+| notes | text | Additional notes |
+| created_at | timestamptz | Auto |
+| updated_at | timestamptz | Auto |
+
+### 3. Request Passengers Table (`request_passengers`)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| request_id | uuid | FK to travel_requests |
+| name | text | Passenger name |
+| phone | text | Contact number |
+| is_primary | boolean | Main contact |
+| created_at | timestamptz | Auto |
+
+### 4. Request History Table (`request_history`)
+
+| Column | Type | Description |
+|--------|------|-------------|
+| id | uuid | Primary key |
+| request_id | uuid | FK to travel_requests |
+| action | text | Status change description |
+| from_status | request_status | Previous status |
+| to_status | request_status | New status |
+| performed_by | uuid | FK to profiles |
+| notes | text | Comments |
+| created_at | timestamptz | Auto |
+
+### 5. RLS Policies
+
+**travel_requests:**
+- Users can view their own requests (requester_id = auth.uid())
+- Approvers can view requests assigned to them (approver_id = auth.uid())
+- Admins/Coordinators can view all requests
+- Users can create requests (requester_id set to their id)
+- Approvers can update status (approve/reject)
+- Admins can manage all requests
+
+**request_passengers:**
+- Same access as parent request
+
+**request_history:**
+- Read-only for all who can view the request
+- Insert allowed for status changes
+
+---
+
+## Frontend Architecture
+
+### Components Structure
 
 ```text
 src/
 ├── pages/
-│   └── Users.tsx                    # Main user management page
+│   ├── Requests.tsx          # Staff: My Requests list
+│   └── Approvals.tsx         # Approver: Pending approvals
 ├── components/
-│   └── users/
-│       ├── CreateUserDialog.tsx     # Create user form (calls edge function)
-│       ├── EditUserDialog.tsx       # Edit profile form
-│       └── RoleManagementDialog.tsx # Role assignment dialog
+│   └── requests/
+│       ├── RequestForm.tsx           # Create/Edit request form
+│       ├── RequestDialog.tsx         # Dialog wrapper
+│       ├── RequestCard.tsx           # Card view for request
+│       ├── RequestDetailDialog.tsx   # View request details
+│       ├── ApprovalDialog.tsx        # Approve/Reject dialog
+│       ├── RequestStatusBadge.tsx    # Status indicator
+│       └── RequestTimeline.tsx       # History timeline
 └── hooks/
-    └── useUsers.ts                  # React Query hooks
+    └── useRequests.ts        # React Query hooks
 ```
 
 ---
 
-## Database Considerations
+## Page: My Requests (`/requests`)
 
-**No schema changes required** - existing tables support all features:
-- `profiles` - User profile data
-- `user_roles` - Role assignments (separate table as required)
-- `user_locations` - Location assignments
+**For Staff role**
 
-**RLS policies already in place:**
-- Group admins can manage all profiles, roles, and location assignments
-- Users can view their own data
+### Features
+- **Create New Request** button opens form dialog
+- **List View** showing all user's requests:
+  - Request number, Purpose, Status, Date, Actions
+  - Filter by status (All, Pending, Approved, etc.)
+  - Sort by date
+- **Request Cards** showing:
+  - Status badge (color-coded)
+  - Pickup/Dropoff details
+  - Scheduled date/time
+  - Approval status
+- **Actions:**
+  - View Details
+  - Edit (if draft or pending)
+  - Cancel (if not yet allocated)
+
+### Request Form Dialog
+
+**Step-by-step or single form:**
+1. **Trip Details:**
+   - Trip Type (One-way, Round-trip)
+   - Pickup Location (text input)
+   - Pickup Date & Time
+   - Dropoff Location
+   - Return Date/Time (if round-trip)
+
+2. **Passengers:**
+   - Number of passengers
+   - Add passenger names & phones (optional)
+   - Mark primary contact
+
+3. **Additional Info:**
+   - Purpose of travel (required)
+   - Priority (Normal/Urgent/VIP)
+   - Special Requirements (textarea)
+   - Cost Center (auto-filled from profile, editable)
+
+4. **Approval:**
+   - Select Approver (dropdown of users with 'approver' role)
+   - This triggers workflow
+
+**Form Validation:**
+- Pickup datetime must be in future
+- Return datetime must be after pickup
+- Purpose required
+- Approver required
 
 ---
 
-## Implementation Details
+## Page: Approvals (`/approvals`)
 
-### 1. Edge Function: `admin-create-user`
+**For Approver role**
 
-**Request Body:**
-```typescript
-{
-  email: string;
-  password: string;
-  full_name: string;
-  phone?: string;
-  employee_id?: string;
-  department?: string;
-  cost_center?: string;
-  roles: AppRole[];           // Array of roles to assign
-  primary_location_id?: string;
-}
+### Features
+- **Tabs:** Pending | Approved | Rejected
+- **Pending List:** Requests awaiting decision
+  - Show requester name, purpose, date
+  - Quick approve/reject buttons
+- **Approval Dialog:**
+  - View full request details
+  - Add comments
+  - Approve or Reject with reason
+
+### Approval Actions
+- **Approve:** Sets status to `approved`, records who/when
+- **Reject:** Sets status to `rejected`, requires reason
+
+---
+
+## React Query Hook: `useRequests.ts`
+
+### Queries
+- `useMyRequests()` - Fetch current user's requests
+- `usePendingApprovals()` - Fetch requests pending user's approval
+- `useRequest(id)` - Fetch single request with passengers/history
+
+### Mutations
+- `useCreateRequest()` - Create new request
+- `useUpdateRequest()` - Update draft/pending request
+- `useCancelRequest()` - Set status to cancelled
+- `useApproveRequest()` - Approve and set status
+- `useRejectRequest()` - Reject with reason
+
+---
+
+## Database Function: Auto-generate Request Number
+
+```sql
+CREATE OR REPLACE FUNCTION generate_request_number()
+RETURNS TRIGGER AS $$
+DECLARE
+  year_part text;
+  seq_num integer;
+BEGIN
+  year_part := to_char(NOW(), 'YYYY');
+  
+  SELECT COALESCE(MAX(
+    CAST(SUBSTRING(request_number FROM 'TR-\d{4}-(\d+)') AS integer)
+  ), 0) + 1
+  INTO seq_num
+  FROM travel_requests
+  WHERE request_number LIKE 'TR-' || year_part || '-%';
+  
+  NEW.request_number := 'TR-' || year_part || '-' || LPAD(seq_num::text, 4, '0');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 ```
 
-**Security:**
-- Verifies JWT token from Authorization header
-- Checks caller has `group_admin` role using `is_admin()` database function
-- Returns 403 if unauthorized
-
-**Process:**
-1. Validate request body with zod
-2. Create auth user with `supabase.auth.admin.createUser()`
-3. Update profile with additional fields (trigger creates basic profile)
-4. Insert roles into `user_roles` table
-5. Insert location assignment to `user_locations` if provided
-6. Return created user data
-
-### 2. React Query Hook: `useUsers.ts`
-
-**Queries:**
-- `useUsers()` - Fetch all users with profiles, roles, and locations
-  - Joins: profiles + user_roles + user_locations + locations
-  - Returns aggregated data per user
-
-**Mutations:**
-- `useCreateUser()` - Calls edge function to create user
-- `useUpdateProfile()` - Updates profile via Supabase client
-- `useAddUserRole()` - Inserts role into user_roles
-- `useRemoveUserRole()` - Deletes role from user_roles
-- `useToggleUserActive()` - Sets is_active on profile
-
-### 3. Users Page: `src/pages/Users.tsx`
-
-**Features:**
-- Data table with columns: Name, Email, Roles, Location, Department, Status, Actions
-- Search by name, email, or employee ID
-- Filter by role (dropdown)
-- Filter by status (active/inactive)
-- Add User button opens CreateUserDialog
-- Row actions: Edit, Manage Roles, Deactivate/Reactivate
-
-**Empty State:**
-- Icon, message, and CTA to add first user
-
-### 4. CreateUserDialog Component
-
-**Form Fields (with zod validation):**
-- Email (required, valid email format)
-- Temporary Password (required, min 8 chars)
-- Full Name (required)
-- Phone (optional)
-- Employee ID (optional)
-- Department (optional)
-- Cost Center (optional)
-- Roles (multi-select checkboxes)
-- Primary Location (dropdown from locations)
-
-**Behavior:**
-- Calls edge function on submit
-- Shows loading state
-- Displays success/error toast
-- Closes and refreshes user list on success
-
-### 5. EditUserDialog Component
-
-**Form Fields:**
-- Full Name, Phone, Employee ID, Department, Cost Center
-- Active toggle (for deactivation)
-- Note: Email cannot be changed (auth identifier)
-
-**Behavior:**
-- Pre-populates with existing data
-- Updates directly via Supabase client (RLS allows group_admin)
-- Shows toast on success/error
-
-### 6. RoleManagementDialog Component
-
-**Display:**
-- User name and email at top
-- List of all available roles with checkboxes
-- Current roles are pre-checked
-
-**Behavior:**
-- Toggle roles on/off immediately (optimistic updates)
-- Direct insert/delete on user_roles table
-- Shows role descriptions for clarity
-
 ---
 
-## Route Registration
+## Route Updates
 
 Add to `src/App.tsx`:
 ```tsx
-<Route
-  path="/users"
-  element={
-    <ProtectedRoute allowedRoles={['group_admin']}>
-      <Users />
-    </ProtectedRoute>
-  }
-/>
+// Staff: My Requests
+<Route path="/requests" element={
+  <ProtectedRoute allowedRoles={['staff']}>
+    <Requests />
+  </ProtectedRoute>
+} />
+
+// Approvers: Approval Queue
+<Route path="/approvals" element={
+  <ProtectedRoute allowedRoles={['approver']}>
+    <Approvals />
+  </ProtectedRoute>
+} />
 ```
 
 ---
@@ -172,37 +253,73 @@ Add to `src/App.tsx`:
 
 | File | Purpose |
 |------|---------|
-| `supabase/functions/admin-create-user/index.ts` | Edge function for secure user creation |
-| `src/pages/Users.tsx` | Main user management page |
-| `src/hooks/useUsers.ts` | React Query data hooks |
-| `src/components/users/CreateUserDialog.tsx` | Create user form dialog |
-| `src/components/users/EditUserDialog.tsx` | Edit profile dialog |
-| `src/components/users/RoleManagementDialog.tsx` | Role assignment dialog |
+| `supabase/migrations/xxx_travel_requests.sql` | Database schema |
+| `src/pages/Requests.tsx` | My Requests page |
+| `src/pages/Approvals.tsx` | Approvals page |
+| `src/hooks/useRequests.ts` | React Query hooks |
+| `src/components/requests/RequestDialog.tsx` | Create/Edit form |
+| `src/components/requests/RequestDetailDialog.tsx` | View details |
+| `src/components/requests/ApprovalDialog.tsx` | Approve/Reject |
+| `src/components/requests/RequestStatusBadge.tsx` | Status display |
+| `src/components/requests/RequestTimeline.tsx` | History view |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/App.tsx` | Add `/users` protected route |
+| `src/App.tsx` | Add /requests and /approvals routes |
+| `src/pages/Dashboard.tsx` | Wire up "New Request" button |
 
 ---
 
-## Security Checklist
+## Implementation Order
 
-- Edge function validates admin role server-side (not client-side)
-- Service role key only used in edge function (never exposed to client)
-- All client-side operations go through RLS-protected tables
-- Input validation with zod on both client and server
-- No sensitive data logged to console
-- Password requirements enforced (min 8 characters)
+1. **Database Migration** - Create tables, enums, functions, and RLS
+2. **useRequests Hook** - Data fetching and mutations
+3. **RequestStatusBadge** - Reusable status component
+4. **RequestDialog** - Create/Edit form
+5. **Requests Page** - Staff view with list
+6. **ApprovalDialog** - Approve/Reject flow
+7. **Approvals Page** - Approver view
+8. **Dashboard Integration** - Connect New Request button
+9. **RequestTimeline** - History visualization
+
+---
+
+## Status Flow
+
+```text
+draft -> pending_approval -> approved -> allocated -> in_progress -> completed
+                          -> rejected
+                          
+[User creates] -> [Approver reviews] -> [Coordinator allocates] -> [Driver completes]
+```
 
 ---
 
 ## UI/UX Notes
 
-- Follow existing patterns from Locations/Vehicles pages
-- Use StatusBadge component for active/inactive status
-- Role badges with distinct colors (already defined in DashboardLayout)
-- Clear empty states with helpful CTAs
-- Toast notifications for all actions
-- Loading states during async operations
+- **Status Colors:**
+  - Draft: Gray
+  - Pending Approval: Yellow/Amber
+  - Approved: Green
+  - Rejected: Red
+  - Allocated: Blue
+  - In Progress: Purple
+  - Completed: Green (different shade)
+  - Cancelled: Gray
+
+- **Empty States:** Clear CTAs for creating first request
+- **Toast Notifications:** For all actions (create, approve, reject)
+- **Loading States:** Skeleton loaders while fetching
+- **Mobile Responsive:** Cards stack on mobile
+
+---
+
+## Security Considerations
+
+- RLS ensures users only see their own requests
+- Approvers only see requests assigned to them
+- Status transitions validated server-side
+- Rejection requires reason (not blank)
+- History auto-logged on status changes
