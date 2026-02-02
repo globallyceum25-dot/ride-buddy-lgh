@@ -19,10 +19,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useDrivers } from '@/hooks/useDrivers';
 import { useCreateAllocation } from '@/hooks/useAllocations';
-import { useBusyResources } from '@/hooks/useBusyResources';
+import { useBusyResources, BusyAllocation } from '@/hooks/useBusyResources';
 
 interface Request {
   id: string;
@@ -46,6 +53,26 @@ interface AllocationDialogProps {
   request: Request | null;
 }
 
+// Tooltip content component for busy resources
+function BusyTooltipContent({ allocation }: { allocation: BusyAllocation }) {
+  return (
+    <div className="space-y-1">
+      <div className="font-medium">
+        {allocation.poolNumber || allocation.requestNumber || 'Unknown Trip'}
+      </div>
+      <div className="text-xs">
+        {format(new Date(allocation.scheduledPickup), 'h:mm a')}
+      </div>
+      <div className="text-xs">
+        {allocation.pickup} → {allocation.dropoff}
+      </div>
+      <div className="text-xs capitalize">
+        Status: {allocation.status.replace('_', ' ')}
+      </div>
+    </div>
+  );
+}
+
 export function AllocationDialog({ open, onOpenChange, request }: AllocationDialogProps) {
   const [vehicleId, setVehicleId] = useState<string>('');
   const [driverId, setDriverId] = useState<string>('');
@@ -59,19 +86,24 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
   const requestDate = request ? format(new Date(request.pickup_datetime), 'yyyy-MM-dd') : null;
   const { data: busyResources } = useBusyResources(requestDate);
   
-  // Filter available vehicles and drivers (excluding those with active allocations)
-  const availableVehicles = vehicles.filter(v => 
+  // Filter vehicles by basic availability and capacity (but include busy ones for display)
+  const eligibleVehicles = vehicles.filter(v => 
     v.is_active && 
     v.status === 'available' && 
-    (v.capacity ?? 0) >= (request?.passenger_count || 1) &&
-    !busyResources?.busyVehicleIds.includes(v.id)
+    (v.capacity ?? 0) >= (request?.passenger_count || 1)
   );
   
-  const availableDrivers = drivers.filter(d => 
+  const eligibleDrivers = drivers.filter(d => 
     d.is_active && 
-    d.status === 'available' &&
-    !busyResources?.busyDriverIds.includes(d.id)
+    d.status === 'available'
   );
+  
+  // Helper to get allocation for a resource
+  const getResourceAllocation = (resourceId: string, type: 'vehicle' | 'driver') => {
+    return busyResources?.allocations.find(a => 
+      type === 'vehicle' ? a.vehicleId === resourceId : a.driverId === resourceId
+    );
+  };
   
   // Reset form when dialog opens
   useEffect(() => {
@@ -133,23 +165,50 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
                 <SelectValue placeholder="Select a vehicle" />
               </SelectTrigger>
               <SelectContent>
-                {availableVehicles.length === 0 ? (
-                  <div className="p-2 text-sm text-muted-foreground text-center">
-                    No available vehicles — all are assigned to trips on this date
-                  </div>
-                ) : (
-                  availableVehicles.map((vehicle) => (
-                    <SelectItem key={vehicle.id} value={vehicle.id}>
-                      <div className="flex items-center gap-2">
-                        <Car className="h-4 w-4" />
-                        <span>{vehicle.registration_number}</span>
-                        <span className="text-muted-foreground">
-                          ({vehicle.make} {vehicle.model} • {vehicle.capacity} seats)
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
+                <TooltipProvider delayDuration={300}>
+                  {eligibleVehicles.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      No vehicles meet capacity requirements
+                    </div>
+                  ) : (
+                    eligibleVehicles.map((vehicle) => {
+                      const isBusy = busyResources?.busyVehicleIds.includes(vehicle.id);
+                      const allocation = isBusy ? getResourceAllocation(vehicle.id, 'vehicle') : null;
+                      
+                      if (isBusy && allocation) {
+                        return (
+                          <Tooltip key={vehicle.id}>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-2 px-2 py-1.5 opacity-50 cursor-not-allowed text-sm">
+                                <Car className="h-4 w-4" />
+                                <span>{vehicle.registration_number}</span>
+                                <span className="text-muted-foreground">
+                                  ({vehicle.make} {vehicle.model} • {vehicle.capacity} seats)
+                                </span>
+                                <Badge variant="secondary" className="ml-auto">Busy</Badge>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">
+                              <BusyTooltipContent allocation={allocation} />
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+                      
+                      return (
+                        <SelectItem key={vehicle.id} value={vehicle.id}>
+                          <div className="flex items-center gap-2">
+                            <Car className="h-4 w-4" />
+                            <span>{vehicle.registration_number}</span>
+                            <span className="text-muted-foreground">
+                              ({vehicle.make} {vehicle.model} • {vehicle.capacity} seats)
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })
+                  )}
+                </TooltipProvider>
               </SelectContent>
             </Select>
           </div>
@@ -162,23 +221,50 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
                 <SelectValue placeholder="Select a driver" />
               </SelectTrigger>
               <SelectContent>
-                {availableDrivers.length === 0 ? (
-                  <div className="p-2 text-sm text-muted-foreground text-center">
-                    No available drivers — all are assigned to trips on this date
-                  </div>
-                ) : (
-                  availableDrivers.map((driver) => (
-                    <SelectItem key={driver.id} value={driver.id}>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        <span>{driver.profile?.full_name || driver.employee_id}</span>
-                        <span className="text-muted-foreground">
-                          ({driver.license_type} license)
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))
-                )}
+                <TooltipProvider delayDuration={300}>
+                  {eligibleDrivers.length === 0 ? (
+                    <div className="p-2 text-sm text-muted-foreground text-center">
+                      No available drivers
+                    </div>
+                  ) : (
+                    eligibleDrivers.map((driver) => {
+                      const isBusy = busyResources?.busyDriverIds.includes(driver.id);
+                      const allocation = isBusy ? getResourceAllocation(driver.id, 'driver') : null;
+                      
+                      if (isBusy && allocation) {
+                        return (
+                          <Tooltip key={driver.id}>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center gap-2 px-2 py-1.5 opacity-50 cursor-not-allowed text-sm">
+                                <User className="h-4 w-4" />
+                                <span>{driver.profile?.full_name || driver.employee_id}</span>
+                                <span className="text-muted-foreground">
+                                  ({driver.license_type} license)
+                                </span>
+                                <Badge variant="secondary" className="ml-auto">Busy</Badge>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">
+                              <BusyTooltipContent allocation={allocation} />
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+                      
+                      return (
+                        <SelectItem key={driver.id} value={driver.id}>
+                          <div className="flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            <span>{driver.profile?.full_name || driver.employee_id}</span>
+                            <span className="text-muted-foreground">
+                              ({driver.license_type} license)
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })
+                  )}
+                </TooltipProvider>
               </SelectContent>
             </Select>
           </div>
