@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import Locations from "./pages/Locations";
 import Vehicles from "./pages/Vehicles";
 import Drivers from "./pages/Drivers";
+import Users from "./pages/Users";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +68,16 @@ const App = () => (
               element={
                 <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
                   <Drivers />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* User Management - Group Admin only */}
+            <Route
+              path="/users"
+              element={
+                <ProtectedRoute allowedRoles={['group_admin']}>
+                  <Users />
                 </ProtectedRoute>
               }
             />
