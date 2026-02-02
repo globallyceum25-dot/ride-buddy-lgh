@@ -48,6 +48,7 @@ import { AllocationStatusBadge } from '@/components/allocations/AllocationStatus
 import { AllocationDialog } from '@/components/allocations/AllocationDialog';
 import { MergeRequestsDialog } from '@/components/allocations/MergeRequestsDialog';
 import { TripTrackingDialog } from '@/components/allocations/TripTrackingDialog';
+import { RouteDisplay } from '@/components/allocations/RouteDisplay';
 import { 
   usePendingAllocation, 
   useAllocations, 
@@ -303,12 +304,11 @@ export default function Allocations() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <div className="text-sm">
-                                <p className="truncate max-w-[120px]">{request.pickup_location}</p>
-                                <p className="text-muted-foreground truncate max-w-[120px]">
-                                  → {request.dropoff_location}
-                                </p>
-                              </div>
+                              <RouteDisplay 
+                                pickup={request.pickup_location} 
+                                destination={request.dropoff_location}
+                                stops={(request as any).stops}
+                              />
                             </TableCell>
                             <TableCell>
                               {format(new Date(request.pickup_datetime), 'MMM d, yyyy')}
@@ -382,12 +382,11 @@ export default function Allocations() {
                               {(allocation as any).driverProfile?.full_name || '—'}
                             </TableCell>
                             <TableCell>
-                              <div className="text-sm">
-                                <p className="truncate max-w-[120px]">{allocation.request?.pickup_location}</p>
-                                <p className="text-muted-foreground truncate max-w-[120px]">
-                                  → {allocation.request?.dropoff_location}
-                                </p>
-                              </div>
+                              <RouteDisplay 
+                                pickup={allocation.request?.pickup_location || ''} 
+                                destination={allocation.request?.dropoff_location || ''}
+                                stops={(allocation as any).stops}
+                              />
                             </TableCell>
                             <TableCell>
                               {format(new Date(allocation.scheduled_pickup), 'MMM d, h:mm a')}

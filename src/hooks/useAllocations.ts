@@ -123,14 +123,27 @@ export function usePendingAllocation() {
       
       // Fetch requester profiles
       const requesterIds = pendingRequests.map(r => r.requester_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, email, department')
-        .in('user_id', requesterIds);
+      const requestIds = pendingRequests.map(r => r.id);
+      
+      const [profilesResult, stopsResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('user_id, full_name, email, department')
+          .in('user_id', requesterIds),
+        supabase
+          .from('request_stops')
+          .select('*')
+          .in('request_id', requestIds)
+          .order('stop_order', { ascending: true }),
+      ]);
+      
+      const profiles = profilesResult.data;
+      const stops = stopsResult.data || [];
       
       return pendingRequests.map(request => ({
         ...request,
         requester: profiles?.find(p => p.user_id === request.requester_id) || null,
+        stops: stops.filter(s => s.request_id === request.id),
       }));
     },
   });
@@ -168,22 +181,35 @@ export function useAllocations(filters?: { status?: AllocationStatus; date?: str
       
       // Fetch requester profiles for each allocation
       const requesterIds = data?.map(a => a.request?.requester_id).filter(Boolean) as string[];
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name, email, department')
-        .in('user_id', requesterIds);
+      const requestIds = data?.map(a => a.request?.id).filter(Boolean) as string[];
       
-      // Fetch driver profiles
-      const driverUserIds = data?.map(a => a.driver?.user_id).filter(Boolean) as string[];
-      const { data: driverProfiles } = await supabase
-        .from('profiles')
-        .select('user_id, full_name')
-        .in('user_id', driverUserIds);
+      const [profilesResult, driverProfilesResult, stopsResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('user_id, full_name, email, department')
+          .in('user_id', requesterIds),
+        // Fetch driver profiles
+        supabase
+          .from('profiles')
+          .select('user_id, full_name')
+          .in('user_id', data?.map(a => a.driver?.user_id).filter(Boolean) as string[]),
+        // Fetch stops for all requests
+        supabase
+          .from('request_stops')
+          .select('*')
+          .in('request_id', requestIds)
+          .order('stop_order', { ascending: true }),
+      ]);
+      
+      const profiles = profilesResult.data;
+      const driverProfiles = driverProfilesResult.data;
+      const stops = stopsResult.data || [];
       
       return data?.map(allocation => ({
         ...allocation,
         requester: profiles?.find(p => p.user_id === allocation.request?.requester_id) || null,
         driverProfile: driverProfiles?.find(p => p.user_id === allocation.driver?.user_id) || null,
+        stops: stops.filter(s => s.request_id === allocation.request?.id),
       })) || [];
     },
   });
