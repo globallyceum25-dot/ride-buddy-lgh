@@ -3,17 +3,17 @@ import { format, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, startOfM
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { DayView } from '@/components/trips/DayView';
-import { MonthView } from '@/components/trips/MonthView';
+import { DetailedCalendarView } from '@/components/trips/DetailedCalendarView';
 import { WeekTimelineView } from '@/components/trips/WeekTimelineView';
 import { CalendarNavigation } from '@/components/trips/CalendarNavigation';
 import { CalendarStatsBar } from '@/components/trips/CalendarStatsBar';
 import { ScheduleFilters } from '@/components/trips/ScheduleFilters';
 import { TripTrackingDialog } from '@/components/allocations/TripTrackingDialog';
 import { 
-  useTripSchedule, 
-  useWeekSchedule,
+  useTripSchedule,
   useMonthSchedule,
   useWeekTrips,
+  type MonthTripPreview,
   useTripStats,
   type ScheduledTrip,
   type TripScheduleFilters,
@@ -242,11 +242,52 @@ export default function TripSchedule() {
         {/* Main Content - View specific */}
         <div className="animate-fade-in">
           {viewMode === 'month' && (
-            <MonthView
+            <DetailedCalendarView
               currentDate={currentMonth}
               selectedDate={selectedDate}
               tripData={monthTripData}
-              onSelectDate={handleMonthDaySelect}
+              onSelectDate={setSelectedDate}
+              onViewDay={handleMonthDaySelect}
+              onStartTrip={(trip: MonthTripPreview) => {
+                const scheduledTrip = {
+                  id: trip.id,
+                  type: trip.isPooled ? 'pooled' : 'single',
+                  scheduledTime: '',
+                  status: trip.status,
+                  pickup: trip.pickup,
+                  dropoff: trip.dropoff,
+                  passengerCount: trip.passengerCount,
+                  vehicle: trip.vehicleReg ? { id: '', registration: trip.vehicleReg, makeModel: '' } : null,
+                  driver: trip.driverName ? { id: '', userId: '', name: trip.driverName } : null,
+                  request: null,
+                  pool: null,
+                  canStartTrip: true,
+                  canCompleteTrip: false,
+                  odometerStart: null,
+                  actualPickup: null,
+                } as ScheduledTrip;
+                handleStartTrip(scheduledTrip);
+              }}
+              onCompleteTrip={(trip: MonthTripPreview) => {
+                const scheduledTrip = {
+                  id: trip.id,
+                  type: trip.isPooled ? 'pooled' : 'single',
+                  scheduledTime: '',
+                  status: trip.status,
+                  pickup: trip.pickup,
+                  dropoff: trip.dropoff,
+                  passengerCount: trip.passengerCount,
+                  vehicle: trip.vehicleReg ? { id: '', registration: trip.vehicleReg, makeModel: '' } : null,
+                  driver: trip.driverName ? { id: '', userId: '', name: trip.driverName } : null,
+                  request: null,
+                  pool: null,
+                  canStartTrip: false,
+                  canCompleteTrip: true,
+                  odometerStart: null,
+                  actualPickup: null,
+                } as ScheduledTrip;
+                handleCompleteTrip(scheduledTrip);
+              }}
               isLoading={monthLoading}
             />
           )}
