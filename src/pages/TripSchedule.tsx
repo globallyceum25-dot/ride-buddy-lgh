@@ -1,17 +1,19 @@
 import { useState, useMemo } from 'react';
-import { format, startOfWeek, addWeeks, subWeeks } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List } from 'lucide-react';
+import { format, startOfWeek, addWeeks, subWeeks, addMonths, subMonths, startOfMonth } from 'date-fns';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
 import { DayView } from '@/components/trips/DayView';
-import { WeekView } from '@/components/trips/WeekView';
+import { MonthView } from '@/components/trips/MonthView';
+import { WeekTimelineView } from '@/components/trips/WeekTimelineView';
+import { CalendarNavigation } from '@/components/trips/CalendarNavigation';
+import { CalendarStatsBar } from '@/components/trips/CalendarStatsBar';
 import { ScheduleFilters } from '@/components/trips/ScheduleFilters';
 import { TripTrackingDialog } from '@/components/allocations/TripTrackingDialog';
 import { 
   useTripSchedule, 
-  useWeekSchedule, 
+  useWeekSchedule,
+  useMonthSchedule,
+  useWeekTrips,
   useTripStats,
   type ScheduledTrip,
   type TripScheduleFilters,
@@ -21,15 +23,16 @@ import { useDrivers } from '@/hooks/useDrivers';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useAuth } from '@/contexts/AuthContext';
 
-type ViewMode = 'day' | 'week';
+type ViewMode = 'day' | 'week' | 'month';
 
 export default function TripSchedule() {
   const { hasRole } = useAuth();
   const isDriver = hasRole('driver');
   const isAdmin = hasRole('group_admin') || hasRole('location_coordinator');
 
-  const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [weekStart, setWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [filters, setFilters] = useState<TripScheduleFilters>({
     myTripsOnly: isDriver,
@@ -41,18 +44,23 @@ export default function TripSchedule() {
   const [selectedTrip, setSelectedTrip] = useState<ScheduledTrip | null>(null);
   const [trackingMode, setTrackingMode] = useState<'start' | 'complete'>('start');
 
-  // Fetch data
+  // Fetch data based on view mode
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
+  
   const { data: schedule = [], isLoading: scheduleLoading } = useTripSchedule({
     ...filters,
     date: dateStr,
   });
-  const { data: weekDays = [], isLoading: weekLoading } = useWeekSchedule(weekStart);
+  
+  const { data: monthTripData = {}, isLoading: monthLoading } = useMonthSchedule(currentMonth);
+  
+  const { data: weekTrips = [], isLoading: weekTripsLoading } = useWeekTrips(weekStart, filters);
+  
   const { data: stats } = useTripStats(dateStr);
   const { data: drivers = [] } = useDrivers();
   const { data: vehicles = [] } = useVehicles();
   
-  // For tracking dialog - need the full allocation data
+  // For tracking dialog
   const { data: allocations = [] } = useAllocations({ date: dateStr });
   
   const updateAllocation = useUpdateAllocationStatus();
@@ -67,17 +75,77 @@ export default function TripSchedule() {
     [vehicles]
   );
 
+  // Navigation title based on view mode
+  const navigationTitle = useMemo(() => {
+    switch (viewMode) {
+      case 'day':
+        return format(selectedDate, 'MMMM d, yyyy');
+      case 'week':
+        return format(weekStart, 'MMMM yyyy');
+      case 'month':
+        return format(currentMonth, 'MMMM yyyy');
+    }
+  }, [viewMode, selectedDate, weekStart, currentMonth]);
+
   // Handlers
   const handleDateChange = (date: Date) => {
     setSelectedDate(date);
     setWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
+    setCurrentMonth(startOfMonth(date));
   };
 
-  const handleWeekNav = (direction: 'prev' | 'next') => {
-    const newWeekStart = direction === 'prev' 
-      ? subWeeks(weekStart, 1) 
-      : addWeeks(weekStart, 1);
-    setWeekStart(newWeekStart);
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+  };
+
+  const handleToday = () => {
+    const today = new Date();
+    setSelectedDate(today);
+    setWeekStart(startOfWeek(today, { weekStartsOn: 1 }));
+    setCurrentMonth(startOfMonth(today));
+  };
+
+  const handlePrevious = () => {
+    switch (viewMode) {
+      case 'day':
+        const prevDay = new Date(selectedDate);
+        prevDay.setDate(prevDay.getDate() - 1);
+        handleDateChange(prevDay);
+        break;
+      case 'week':
+        setWeekStart(subWeeks(weekStart, 1));
+        break;
+      case 'month':
+        setCurrentMonth(subMonths(currentMonth, 1));
+        break;
+    }
+  };
+
+  const handleNext = () => {
+    switch (viewMode) {
+      case 'day':
+        const nextDay = new Date(selectedDate);
+        nextDay.setDate(nextDay.getDate() + 1);
+        handleDateChange(nextDay);
+        break;
+      case 'week':
+        setWeekStart(addWeeks(weekStart, 1));
+        break;
+      case 'month':
+        setCurrentMonth(addMonths(currentMonth, 1));
+        break;
+    }
+  };
+
+  const handleMonthDaySelect = (date: Date) => {
+    setSelectedDate(date);
+    setWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
+    setViewMode('day');
+  };
+
+  const handleWeekDaySelect = (date: Date) => {
+    setSelectedDate(date);
+    setViewMode('day');
   };
 
   const handleStartTrip = (trip: ScheduledTrip) => {
@@ -124,130 +192,86 @@ export default function TripSchedule() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">Trip Schedule</h1>
-            <p className="text-muted-foreground">
-              {isDriver ? 'View and manage your assigned trips' : 'View all scheduled trips'}
-            </p>
-          </div>
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
-            <TabsList>
-              <TabsTrigger value="day">
-                <CalendarIcon className="h-4 w-4 mr-2" />
-                Day
-              </TabsTrigger>
-              <TabsTrigger value="week">
-                <List className="h-4 w-4 mr-2" />
-                Week
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+        <div>
+          <h1 className="text-3xl font-bold">Trip Schedule</h1>
+          <p className="text-muted-foreground">
+            {isDriver ? 'View and manage your assigned trips' : 'View all scheduled trips'}
+          </p>
         </div>
 
-        {/* Stats */}
-        {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Today
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.tripsToday}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  In Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">{stats.inProgress}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Completed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.completed}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  This Week
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.upcomingThisWeek}</div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {/* Stats Bar */}
+        <CalendarStatsBar stats={stats} />
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <ScheduleFilters
-              date={selectedDate}
-              onDateChange={handleDateChange}
-              driverId={filters.driverId}
-              onDriverChange={(id) => setFilters(prev => ({ ...prev, driverId: id }))}
-              vehicleId={filters.vehicleId}
-              onVehicleChange={(id) => setFilters(prev => ({ ...prev, vehicleId: id }))}
-              statusFilter={filters.status}
-              onStatusFilterChange={(status) => setFilters(prev => ({ ...prev, status }))}
-              myTripsOnly={filters.myTripsOnly}
-              onMyTripsOnlyChange={(checked) => setFilters(prev => ({ ...prev, myTripsOnly: checked }))}
-              drivers={driverOptions}
-              vehicles={vehicleOptions}
-              showDriverFilter={isAdmin}
-              showVehicleFilter={isAdmin}
-              showMyTripsToggle={isDriver}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Week Navigation (when in week view) */}
-        {viewMode === 'week' && (
-          <div className="flex items-center justify-between">
-            <Button variant="outline" size="icon" onClick={() => handleWeekNav('prev')}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="font-medium">
-              {format(weekStart, 'MMM d')} - {format(addWeeks(weekStart, 1), 'MMM d, yyyy')}
-            </span>
-            <Button variant="outline" size="icon" onClick={() => handleWeekNav('next')}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {/* Main Content */}
-        {viewMode === 'week' && (
-          <WeekView
-            weekDays={weekDays}
-            selectedDate={dateStr}
-            onSelectDate={(date) => {
-              setSelectedDate(new Date(date));
-              setViewMode('day');
-            }}
-            isLoading={weekLoading}
-          />
-        )}
-
-        <DayView
-          schedule={schedule}
-          onStartTrip={handleStartTrip}
-          onCompleteTrip={handleCompleteTrip}
-          isLoading={scheduleLoading}
+        {/* Calendar Navigation */}
+        <CalendarNavigation
+          currentDate={viewMode === 'month' ? currentMonth : viewMode === 'week' ? weekStart : selectedDate}
+          viewMode={viewMode}
+          onDateChange={handleDateChange}
+          onViewModeChange={handleViewModeChange}
+          onToday={handleToday}
+          onPrevious={handlePrevious}
+          onNext={handleNext}
+          title={navigationTitle}
         />
+
+        {/* Filters - shown for day and week views */}
+        {viewMode !== 'month' && (
+          <Card>
+            <CardContent className="pt-6">
+              <ScheduleFilters
+                date={selectedDate}
+                onDateChange={handleDateChange}
+                driverId={filters.driverId}
+                onDriverChange={(id) => setFilters(prev => ({ ...prev, driverId: id }))}
+                vehicleId={filters.vehicleId}
+                onVehicleChange={(id) => setFilters(prev => ({ ...prev, vehicleId: id }))}
+                statusFilter={filters.status}
+                onStatusFilterChange={(status) => setFilters(prev => ({ ...prev, status }))}
+                myTripsOnly={filters.myTripsOnly}
+                onMyTripsOnlyChange={(checked) => setFilters(prev => ({ ...prev, myTripsOnly: checked }))}
+                drivers={driverOptions}
+                vehicles={vehicleOptions}
+                showDriverFilter={isAdmin}
+                showVehicleFilter={isAdmin}
+                showMyTripsToggle={isDriver}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main Content - View specific */}
+        <div className="animate-fade-in">
+          {viewMode === 'month' && (
+            <MonthView
+              currentDate={currentMonth}
+              selectedDate={selectedDate}
+              tripData={monthTripData}
+              onSelectDate={handleMonthDaySelect}
+              isLoading={monthLoading}
+            />
+          )}
+
+          {viewMode === 'week' && (
+            <WeekTimelineView
+              weekStart={weekStart}
+              selectedDate={selectedDate}
+              trips={weekTrips}
+              onSelectDate={handleWeekDaySelect}
+              onStartTrip={handleStartTrip}
+              onCompleteTrip={handleCompleteTrip}
+              isLoading={weekTripsLoading}
+            />
+          )}
+
+          {viewMode === 'day' && (
+            <DayView
+              schedule={schedule}
+              onStartTrip={handleStartTrip}
+              onCompleteTrip={handleCompleteTrip}
+              isLoading={scheduleLoading}
+            />
+          )}
+        </div>
       </div>
 
       {/* Trip Tracking Dialog */}
