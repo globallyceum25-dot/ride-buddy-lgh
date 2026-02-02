@@ -117,6 +117,7 @@ export function PublicFormLinks() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
+                  <TableHead>Department</TableHead>
                   <TableHead>Link</TableHead>
                   <TableHead className="text-center">Submissions</TableHead>
                   <TableHead>Expires</TableHead>
@@ -136,6 +137,15 @@ export function PublicFormLinks() {
                           </p>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      {(link as any).department ? (
+                        <Badge variant="outline">
+                          {(link as any).department.name}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
