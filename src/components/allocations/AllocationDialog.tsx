@@ -22,6 +22,7 @@ import {
 import { useVehicles } from '@/hooks/useVehicles';
 import { useDrivers } from '@/hooks/useDrivers';
 import { useCreateAllocation } from '@/hooks/useAllocations';
+import { useBusyResources } from '@/hooks/useBusyResources';
 
 interface Request {
   id: string;
@@ -54,14 +55,22 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
   const { data: drivers = [] } = useDrivers();
   const createAllocation = useCreateAllocation();
   
-  // Filter available vehicles and drivers
+  // Get the date from the request for busy resource check
+  const requestDate = request ? format(new Date(request.pickup_datetime), 'yyyy-MM-dd') : null;
+  const { data: busyResources } = useBusyResources(requestDate);
+  
+  // Filter available vehicles and drivers (excluding those with active allocations)
   const availableVehicles = vehicles.filter(v => 
-    v.is_active && v.status === 'available' && 
-    (v.capacity ?? 0) >= (request?.passenger_count || 1)
+    v.is_active && 
+    v.status === 'available' && 
+    (v.capacity ?? 0) >= (request?.passenger_count || 1) &&
+    !busyResources?.busyVehicleIds.includes(v.id)
   );
   
   const availableDrivers = drivers.filter(d => 
-    d.is_active && d.status === 'available'
+    d.is_active && 
+    d.status === 'available' &&
+    !busyResources?.busyDriverIds.includes(d.id)
   );
   
   // Reset form when dialog opens
@@ -126,7 +135,7 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
               <SelectContent>
                 {availableVehicles.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">
-                    No available vehicles with sufficient capacity
+                    No available vehicles — all are assigned to trips on this date
                   </div>
                 ) : (
                   availableVehicles.map((vehicle) => (
@@ -155,7 +164,7 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
               <SelectContent>
                 {availableDrivers.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">
-                    No available drivers
+                    No available drivers — all are assigned to trips on this date
                   </div>
                 ) : (
                   availableDrivers.map((driver) => (
