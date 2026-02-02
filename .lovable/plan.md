@@ -1,8 +1,9 @@
 
-# Reporting Module Implementation
+
+# Settings Module Implementation
 
 ## Overview
-A comprehensive analytics module to analyze fleet data across four dimensions: Vehicles, Drivers (Person-wise), Locations, and Departments. The module will provide both summary statistics and detailed breakdowns with visualizations.
+Build a comprehensive Settings module for Group Admins to manage organization-wide configurations, master data lists (departments, cost centers), and view system audit logs.
 
 ---
 
@@ -12,200 +13,183 @@ A comprehensive analytics module to analyze fleet data across four dimensions: V
 
 | File | Purpose |
 |------|---------|
-| `src/pages/Reports.tsx` | Main reports page with tabbed interface |
-| `src/hooks/useReportData.ts` | Hook to fetch and aggregate report data |
-| `src/components/reports/VehicleReport.tsx` | Vehicle utilization analytics |
-| `src/components/reports/DriverReport.tsx` | Driver performance analytics |
-| `src/components/reports/LocationReport.tsx` | Location-based trip analytics |
-| `src/components/reports/DepartmentReport.tsx` | Department-wise cost/trip analysis |
-| `src/components/reports/ReportFilters.tsx` | Date range and filter controls |
-| `src/components/reports/StatCard.tsx` | Reusable summary stat card |
+| `src/pages/Settings.tsx` | Main settings page with tabbed interface |
+| `src/hooks/useSettings.ts` | Hook for fetching/updating settings data |
+| `src/components/settings/GeneralSettings.tsx` | Organization info and defaults |
+| `src/components/settings/DepartmentSettings.tsx` | Manage departments list |
+| `src/components/settings/CostCenterSettings.tsx` | Manage cost centers list |
+| `src/components/settings/AuditLogs.tsx` | View system audit trail |
+| `src/components/settings/DepartmentDialog.tsx` | Add/edit department dialog |
+| `src/components/settings/CostCenterDialog.tsx` | Add/edit cost center dialog |
 
 ### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/App.tsx` | Add `/reports` route |
+| `src/App.tsx` | Add `/settings` route |
+
+### Database Migration
+
+Create two new tables to properly manage departments and cost centers:
+
+```sql
+-- Departments table
+CREATE TABLE public.departments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  code TEXT UNIQUE,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Cost Centers table  
+CREATE TABLE public.cost_centers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  code TEXT NOT NULL UNIQUE,
+  department_id UUID REFERENCES departments(id),
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- System Settings (key-value store for org settings)
+CREATE TABLE public.system_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  key TEXT NOT NULL UNIQUE,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  updated_by UUID REFERENCES auth.users(id)
+);
+
+-- RLS Policies
+ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cost_centers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+
+-- Read access for all authenticated users
+CREATE POLICY "Authenticated users can read departments" 
+  ON departments FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "Authenticated users can read cost_centers" 
+  ON cost_centers FOR SELECT TO authenticated USING (true);
+
+-- Write access only for admins
+CREATE POLICY "Admins can manage departments" 
+  ON departments FOR ALL TO authenticated 
+  USING (public.is_admin(auth.uid()));
+
+CREATE POLICY "Admins can manage cost_centers" 
+  ON cost_centers FOR ALL TO authenticated 
+  USING (public.is_admin(auth.uid()));
+
+CREATE POLICY "Admins can manage system_settings" 
+  ON system_settings FOR ALL TO authenticated 
+  USING (public.is_admin(auth.uid()));
+```
 
 ---
 
-## Data Analysis Capabilities
+## Settings Sections
 
-### 1. Vehicle-wise Report
-- **Total trips** per vehicle
-- **Distance covered** (odometer_end - odometer_start)
-- **Utilization rate** (trips vs available days)
-- **Average passengers** per trip
-- **Status breakdown** (completed, cancelled, etc.)
+### 1. General Settings Tab
+- **Organization Name**: Company display name
+- **Default Location**: Pre-selected location for new requests
+- **Request Number Prefix**: Customize TR prefix (e.g., "LGH-")
+- **Timezone**: System timezone setting
+- **Date Format**: DD/MM/YYYY or MM/DD/YYYY
 
-**Metrics displayed:**
-- Bar chart: Trips by vehicle
-- Line chart: Mileage trend over time
-- Table: Detailed vehicle statistics
+### 2. Departments Tab
+- Full CRUD for departments list
+- Table with columns: Name, Code, Status, Actions
+- Used in user profiles and request filtering
+- Bulk import/export capability
 
-### 2. Driver-wise Report (Person-wise)
-- **Total trips** assigned
-- **Completed trips** vs cancelled
-- **Total hours** on duty (actual_pickup to actual_dropoff)
-- **Average trip duration**
-- **Performance score** (on-time pickups)
+### 3. Cost Centers Tab
+- Full CRUD for cost centers
+- Link cost centers to departments (optional)
+- Table with columns: Code, Name, Department, Status, Actions
+- Used for expense tracking and reporting
 
-**Metrics displayed:**
-- Bar chart: Trips by driver
-- Pie chart: Trip status distribution
-- Table: Driver performance ranking
-
-### 3. Location-wise Report
-- **Trips originating** from each location
-- **Trips terminating** at each location
-- **Busiest routes** (pickup → dropoff pairs)
-- **Peak hours** by location
-
-**Metrics displayed:**
-- Bar chart: Trips by location (origin/destination)
-- Heat map style table: Route frequency
-- Time-based chart: Peak demand hours
-
-### 4. Department-wise Report
-- **Total requests** by department
-- **Approved vs rejected** rate
-- **Average passengers** per department
-- **Cost center** analysis
-- **Trip types** breakdown (one-way, round-trip)
-
-**Metrics displayed:**
-- Pie chart: Request distribution by department
-- Bar chart: Request status by department
-- Table: Detailed department breakdown
+### 4. Audit Logs Tab
+- Read-only view of system activities
+- Filters: Date range, Action type, User, Table
+- Columns: Timestamp, User, Action, Table, Record, Changes
+- Export to CSV option
 
 ---
 
 ## UI Design
 
-### Main Reports Page Layout
+### Main Settings Page Layout
 
 ```text
 +--------------------------------------------------+
-|  Reports                    [Date Range Picker]  |
-|  Analyze fleet performance                       |
+|  Settings                                         |
+|  Configure system preferences and master data     |
 +--------------------------------------------------+
-|                                                  |
-|  [Vehicle] [Driver] [Location] [Department]      |
-|  ─────────────────────────────────────────────── |
-|                                                  |
-|  +------------+ +------------+ +------------+    |
-|  | Total Trips| | Distance   | | Utilization|    |
-|  |    156     | |  12,450 km | |    78%     |    |
-|  +------------+ +------------+ +------------+    |
-|                                                  |
-|  +------------------------------------------+   |
-|  |           [Chart Visualization]          |   |
-|  +------------------------------------------+   |
-|                                                  |
-|  +------------------------------------------+   |
-|  |           [Data Table]                    |   |
-|  +------------------------------------------+   |
-|                                                  |
+|                                                   |
+|  [General] [Departments] [Cost Centers] [Audit]   |
+|  ────────────────────────────────────────────────|
+|                                                   |
+|  ┌─────────────────────────────────────────────┐ |
+|  │  Tab Content Area                           │ |
+|  │                                             │ |
+|  │  (Forms, Tables, or Logs depending on tab) │ |
+|  │                                             │ |
+|  └─────────────────────────────────────────────┘ |
+|                                                   |
 +--------------------------------------------------+
 ```
 
-### Filter Controls
-- **Date range picker**: Start and end date
-- **Quick presets**: Today, This Week, This Month, Last 30 Days, This Year
-- **Export button**: CSV download option
+### General Settings Tab
 
----
-
-## Technical Implementation
-
-### Report Data Hook
-
-```typescript
-// src/hooks/useReportData.ts
-interface ReportFilters {
-  startDate: string;
-  endDate: string;
-}
-
-export function useVehicleReport(filters: ReportFilters) {
-  return useQuery({
-    queryKey: ['vehicle-report', filters],
-    queryFn: async () => {
-      const { data: allocations } = await supabase
-        .from('allocations')
-        .select(`
-          vehicle_id,
-          status,
-          odometer_start,
-          odometer_end,
-          scheduled_pickup,
-          actual_pickup,
-          actual_dropoff,
-          vehicle:vehicles(id, registration_number, make, model),
-          request:travel_requests(passenger_count)
-        `)
-        .gte('scheduled_pickup', filters.startDate)
-        .lte('scheduled_pickup', filters.endDate);
-      
-      // Aggregate by vehicle
-      return aggregateVehicleData(allocations);
-    }
-  });
-}
-
-export function useDriverReport(filters: ReportFilters) { /* similar */ }
-export function useLocationReport(filters: ReportFilters) { /* similar */ }
-export function useDepartmentReport(filters: ReportFilters) { /* similar */ }
+```text
+┌─────────────────────────────────────────────────┐
+│  Organization Settings                          │
+│  ─────────────────────────────────────────────  │
+│                                                 │
+│  Organization Name    [LGH Fleet Management  ] │
+│  Request Prefix       [TR-                   ] │
+│  Default Location     [Select location    ▼  ] │
+│                                                 │
+│                              [Save Changes]    │
+└─────────────────────────────────────────────────┘
 ```
 
-### Chart Components (using recharts)
+### Departments Tab
 
-The project already has `recharts` installed, so charts will use:
-- `BarChart` for comparison metrics
-- `PieChart` for distribution breakdowns
-- `LineChart` for trends over time
-- `ResponsiveContainer` for responsive sizing
-
-### Summary Statistics
-
-Each report tab will show 3-4 key metrics at the top:
-- Large number display
-- Comparison to previous period (optional)
-- Trend indicator
-
----
-
-## Sample Queries
-
-### Vehicle Report Query
-```sql
-SELECT 
-  v.registration_number,
-  v.make,
-  v.model,
-  COUNT(a.id) as total_trips,
-  SUM(COALESCE(a.odometer_end, 0) - COALESCE(a.odometer_start, 0)) as total_distance,
-  AVG(tr.passenger_count) as avg_passengers,
-  COUNT(CASE WHEN a.status = 'completed' THEN 1 END) as completed_trips
-FROM vehicles v
-LEFT JOIN allocations a ON a.vehicle_id = v.id
-LEFT JOIN travel_requests tr ON a.request_id = tr.id
-WHERE a.scheduled_pickup BETWEEN :start AND :end
-GROUP BY v.id
+```text
+┌─────────────────────────────────────────────────┐
+│  Departments                    [+ Add Dept]    │
+│  ─────────────────────────────────────────────  │
+│  ┌───────────────────────────────────────────┐  │
+│  │ Name           │ Code  │ Status │ Actions │  │
+│  ├───────────────────────────────────────────│  │
+│  │ IT Department  │ IT    │ Active │  ⋮      │  │
+│  │ HR Department  │ HR    │ Active │  ⋮      │  │
+│  │ Finance        │ FIN   │ Active │  ⋮      │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
 ```
 
-### Department Report Query
-```sql
-SELECT 
-  p.department,
-  COUNT(tr.id) as total_requests,
-  COUNT(CASE WHEN tr.status = 'completed' THEN 1 END) as completed,
-  COUNT(CASE WHEN tr.status = 'rejected' THEN 1 END) as rejected,
-  SUM(tr.passenger_count) as total_passengers
-FROM travel_requests tr
-JOIN profiles p ON tr.requester_id = p.user_id
-WHERE tr.created_at BETWEEN :start AND :end
-GROUP BY p.department
+### Audit Logs Tab
+
+```text
+┌─────────────────────────────────────────────────┐
+│  Audit Trail                    [Export CSV]    │
+│  ─────────────────────────────────────────────  │
+│  [Date Range: Last 7 days ▼] [Action ▼] [User▼] │
+│                                                 │
+│  ┌───────────────────────────────────────────┐  │
+│  │ Time      │ User  │ Action │ Table │ Desc │  │
+│  ├───────────────────────────────────────────│  │
+│  │ 2m ago    │ Admin │ UPDATE │ users │ ...  │  │
+│  │ 15m ago   │ Admin │ CREATE │ vehic │ ...  │  │
+│  │ 1h ago    │ Coord │ UPDATE │ alloc │ ...  │  │
+│  └───────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────┘
 ```
 
 ---
@@ -213,67 +197,147 @@ GROUP BY p.department
 ## Component Structure
 
 ```text
-Reports.tsx
-├── ReportFilters (date range, export)
+Settings.tsx
 ├── Tabs
-│   ├── VehicleReport
-│   │   ├── StatCard x 3
-│   │   ├── BarChart (trips by vehicle)
-│   │   └── DataTable
-│   ├── DriverReport
-│   │   ├── StatCard x 3
-│   │   ├── BarChart (trips by driver)
-│   │   └── DataTable
-│   ├── LocationReport
-│   │   ├── StatCard x 3
-│   │   ├── BarChart (by location)
-│   │   └── RouteTable
-│   └── DepartmentReport
-│       ├── StatCard x 3
-│       ├── PieChart (distribution)
-│       └── DataTable
+│   ├── GeneralSettings
+│   │   └── Form (org name, defaults)
+│   ├── DepartmentSettings
+│   │   ├── Search + Add Button
+│   │   ├── DataTable
+│   │   └── DepartmentDialog (create/edit)
+│   ├── CostCenterSettings
+│   │   ├── Search + Add Button
+│   │   ├── DataTable
+│   │   └── CostCenterDialog (create/edit)
+│   └── AuditLogs
+│       ├── Filters (date, action, user)
+│       ├── DataTable
+│       └── Export Button
+```
+
+---
+
+## Technical Implementation
+
+### Settings Hook
+
+```typescript
+// src/hooks/useSettings.ts
+export function useDepartments() {
+  return useQuery({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('departments')
+        .select('*')
+        .order('name');
+      return data;
+    }
+  });
+}
+
+export function useCostCenters() {
+  return useQuery({
+    queryKey: ['cost_centers'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('cost_centers')
+        .select('*, department:departments(name)')
+        .order('code');
+      return data;
+    }
+  });
+}
+
+export function useAuditLogs(filters: AuditFilters) {
+  return useQuery({
+    queryKey: ['audit_logs', filters],
+    queryFn: async () => {
+      let query = supabase
+        .from('audit_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      
+      if (filters.startDate) {
+        query = query.gte('created_at', filters.startDate);
+      }
+      if (filters.action) {
+        query = query.eq('action', filters.action);
+      }
+      
+      const { data } = await query;
+      return data;
+    }
+  });
+}
+```
+
+### Mutation Hooks
+
+```typescript
+export function useCreateDepartment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (dept: { name: string; code?: string }) => {
+      const { data, error } = await supabase
+        .from('departments')
+        .insert(dept)
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      toast.success('Department created');
+    }
+  });
+}
 ```
 
 ---
 
 ## Access Control
 
-The Reports page will be accessible to:
-- `location_coordinator` - Can view reports for their location
-- `group_admin` - Can view all reports across locations
-
-This follows the existing nav item configuration in `DashboardLayout.tsx` (line 97-102).
+- Settings page: `group_admin` only (already configured in DashboardLayout)
+- Departments/Cost Centers: Read by all authenticated, write by admin
+- Audit Logs: Read by admin only
+- System Settings: Read/write by admin only
 
 ---
 
 ## Implementation Phases
 
 ### Phase 1: Foundation
-1. Create `Reports.tsx` page with tab structure
-2. Create `useReportData.ts` hook with basic queries
-3. Create `ReportFilters.tsx` with date range picker
-4. Add route to `App.tsx`
+1. Create database migration for departments, cost_centers, system_settings tables
+2. Create `Settings.tsx` page with tab structure
+3. Add `/settings` route to App.tsx
+4. Create `useSettings.ts` hook with basic queries
 
-### Phase 2: Vehicle and Driver Reports
-1. Implement `VehicleReport.tsx` with charts and table
-2. Implement `DriverReport.tsx` with performance metrics
-3. Create reusable `StatCard.tsx` component
+### Phase 2: Departments & Cost Centers
+1. Implement `DepartmentSettings.tsx` with CRUD table
+2. Implement `CostCenterSettings.tsx` with CRUD table
+3. Create dialog components for add/edit
 
-### Phase 3: Location and Department Reports
-1. Implement `LocationReport.tsx` with route analysis
-2. Implement `DepartmentReport.tsx` with cost breakdown
+### Phase 3: General Settings & Audit
+1. Implement `GeneralSettings.tsx` with org config form
+2. Implement `AuditLogs.tsx` with filtering and table
+3. Add CSV export for audit logs
 
-### Phase 4: Polish
-1. Add CSV export functionality
-2. Add loading states and empty states
-3. Responsive design adjustments
+### Phase 4: Integration
+1. Update user creation to use departments dropdown
+2. Update request forms to use cost centers dropdown
+3. Add empty states and loading states
 
 ---
 
 ## Testing Checklist
-1. Verify date range filters work correctly
-2. Test with no data (empty state)
-3. Test with various date ranges
-4. Verify charts render properly
-5. Test access control (coordinator vs admin views)
-6. Test CSV export functionality
+
+1. Verify only group_admin can access Settings page
+2. Test creating, editing, and deactivating departments
+3. Test creating cost centers linked to departments
+4. Verify audit logs display with proper filtering
+5. Test CSV export functionality
+6. Verify departments/cost centers appear in related forms
+
