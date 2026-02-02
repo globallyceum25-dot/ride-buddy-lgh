@@ -1,114 +1,166 @@
 
-# Prevent Double-Booking of Vehicles and Drivers
+# Add Tooltip for Busy Vehicle/Driver Assignments
 
-## Problem
-Currently, when assigning a vehicle and driver to a trip, the system only checks if the vehicle/driver is marked as "available" in their master data. It doesn't check if they're already scheduled for another trip on the same day that hasn't been completed yet.
+## Overview
+Enhance the allocation dialogs to show busy vehicles and drivers as disabled options with a tooltip that displays which trip they're already assigned to on that date.
 
-## Solution
-Add logic to filter out vehicles and drivers that have non-completed allocations on the same date as the request being scheduled.
+---
+
+## Current Behavior
+- Busy vehicles/drivers are completely hidden from the selection dropdowns
+- Users only see "No available vehicles/drivers" when all are busy
+
+## New Behavior
+- Show ALL vehicles/drivers in the dropdown
+- Busy resources appear as disabled items with a "Busy" badge
+- Hovering over a busy resource shows a tooltip with trip details:
+  - Request number or Pool number
+  - Pickup time
+  - Route (pickup → dropoff)
+  - Status
 
 ---
 
 ## Implementation
 
-### 1. Create a New Hook: `useBusyResources`
-Create a utility hook that fetches allocations for a specific date and returns lists of busy vehicle and driver IDs.
+### 1. Enhance `useBusyResources` Hook
+Expand the query to return allocation details, not just IDs.
 
+**New return type:**
 ```typescript
-// src/hooks/useBusyResources.ts
-export function useBusyResources(date: string | null) {
-  return useQuery({
-    queryKey: ['busy-resources', date],
-    enabled: !!date,
-    queryFn: async () => {
-      // Fetch allocations for the date that are NOT completed/cancelled
-      const { data } = await supabase
-        .from('allocations')
-        .select('vehicle_id, driver_id, status')
-        .gte('scheduled_pickup', `${date}T00:00:00`)
-        .lte('scheduled_pickup', `${date}T23:59:59`)
-        .not('status', 'in', '("completed","cancelled")');
-      
-      return {
-        busyVehicleIds: [...new Set(data?.map(a => a.vehicle_id).filter(Boolean))],
-        busyDriverIds: [...new Set(data?.map(a => a.driver_id).filter(Boolean))],
-      };
-    },
-  });
+interface BusyAllocation {
+  vehicleId: string | null;
+  driverId: string | null;
+  requestNumber: string | null;
+  poolNumber: string | null;
+  scheduledPickup: string;
+  pickup: string;
+  dropoff: string;
+  status: string;
+}
+
+interface BusyResources {
+  busyVehicleIds: string[];
+  busyDriverIds: string[];
+  allocations: BusyAllocation[];  // Full details for tooltips
 }
 ```
 
+**Query changes:**
+- Join with `travel_requests` to get request_number, pickup/dropoff locations
+- Join with `trip_pools` to get pool_number if applicable
+
 ### 2. Update AllocationDialog
-- Extract the date from the request's `pickup_datetime`
-- Use `useBusyResources(date)` to get busy IDs
-- Filter out busy vehicles and drivers from the available lists
-- Show a visual indicator for resources that are busy
+- Show all vehicles/drivers (available + busy)
+- For busy items:
+  - Add `disabled` prop to prevent selection
+  - Wrap in Tooltip showing assignment details
+  - Add visual "Busy" badge
 
-**Key changes:**
-```typescript
-const requestDate = request ? format(new Date(request.pickup_datetime), 'yyyy-MM-dd') : null;
-const { data: busyResources } = useBusyResources(requestDate);
-
-const availableVehicles = vehicles.filter(v => 
-  v.is_active && 
-  v.status === 'available' && 
-  (v.capacity ?? 0) >= (request?.passenger_count || 1) &&
-  !busyResources?.busyVehicleIds.includes(v.id)
-);
-
-const availableDrivers = drivers.filter(d => 
-  d.is_active && 
-  d.status === 'available' &&
-  !busyResources?.busyDriverIds.includes(d.id)
-);
+**UI Example:**
+```
+┌─────────────────────────────────────────────────┐
+│ ✓ ABC-1234 (Toyota Hiace • 12 seats)           │  ← Available
+│ ─────────────────────────────────────────────── │
+│ 🚫 XYZ-5678 (Honda City • 4 seats)   [Busy]    │  ← Disabled + Tooltip
+│    Tooltip: "Assigned to TR-2026-001           │
+│              9:00 AM • HQ → Airport            │
+│              Status: In Progress"              │
+└─────────────────────────────────────────────────┘
 ```
 
 ### 3. Update MergeRequestsDialog
-- Extract the date from the first request
-- Use `useBusyResources(date)` to get busy IDs
-- Apply the same filtering logic
+Apply the same changes as AllocationDialog.
 
 ---
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/hooks/useBusyResources.ts` | Hook to fetch vehicles/drivers with active allocations on a date |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/allocations/AllocationDialog.tsx` | Filter out busy vehicles/drivers |
-| `src/components/allocations/MergeRequestsDialog.tsx` | Filter out busy vehicles/drivers |
+| `src/hooks/useBusyResources.ts` | Add allocation details to return value |
+| `src/components/allocations/AllocationDialog.tsx` | Show busy items with tooltip |
+| `src/components/allocations/MergeRequestsDialog.tsx` | Show busy items with tooltip |
 
 ---
 
-## User Experience
+## Technical Details
 
-### Empty state message updates
-When no vehicles/drivers are available because they're all busy:
-- **Vehicle**: "No available vehicles — all are assigned to trips on this date"
-- **Driver**: "No available drivers — all are assigned to trips on this date"
+### Helper Function
+Create a helper to get allocation details for a specific resource:
 
-### Optional: Show busy resources with indicator
-Alternatively, show busy resources in the dropdown but disabled with a "Busy" badge, allowing users to see what's unavailable and why.
+```typescript
+const getResourceAllocation = (resourceId: string, type: 'vehicle' | 'driver') => {
+  return busyResources?.allocations.find(a => 
+    type === 'vehicle' ? a.vehicleId === resourceId : a.driverId === resourceId
+  );
+};
+```
+
+### Tooltip Content Component
+```typescript
+const BusyTooltipContent = ({ allocation }: { allocation: BusyAllocation }) => (
+  <div className="space-y-1">
+    <div className="font-medium">
+      {allocation.poolNumber || allocation.requestNumber}
+    </div>
+    <div className="text-xs">
+      {format(new Date(allocation.scheduledPickup), 'h:mm a')}
+    </div>
+    <div className="text-xs">
+      {allocation.pickup} → {allocation.dropoff}
+    </div>
+    <div className="text-xs capitalize">
+      Status: {allocation.status.replace('_', ' ')}
+    </div>
+  </div>
+);
+```
+
+### Select Item Rendering
+```tsx
+{vehicles.map((vehicle) => {
+  const isBusy = busyResources?.busyVehicleIds.includes(vehicle.id);
+  const allocation = isBusy ? getResourceAllocation(vehicle.id, 'vehicle') : null;
+  
+  if (isBusy && allocation) {
+    return (
+      <Tooltip key={vehicle.id}>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-2 px-2 py-1.5 opacity-50 cursor-not-allowed">
+            <Car className="h-4 w-4" />
+            <span>{vehicle.registration_number}</span>
+            <Badge variant="secondary" className="ml-auto">Busy</Badge>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <BusyTooltipContent allocation={allocation} />
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  
+  return (
+    <SelectItem key={vehicle.id} value={vehicle.id}>
+      {/* ... normal rendering */}
+    </SelectItem>
+  );
+})}
+```
 
 ---
 
-## Edge Cases Handled
+## Edge Cases
 
-1. **Multiple allocations on same day**: A vehicle can have multiple trips on the same day only if previous trips are completed
-2. **Cancelled allocations**: Vehicles/drivers with cancelled allocations are still available
-3. **Completed trips**: Once a trip is completed, the vehicle/driver becomes available again
-4. **Pool allocations**: Works correctly with pooled trips since they also create allocation records
+1. **Vehicle/driver assigned to multiple trips**: Show first upcoming allocation
+2. **No pickup/dropoff info** (edge case): Show request number only
+3. **Pool vs single trip**: Display appropriate identifier (POOL-xxx vs TR-xxx)
 
 ---
 
-## Testing Checklist
-1. Create allocation A with Vehicle X and Driver Y for Feb 3
-2. Try to create allocation B with same vehicle/driver on Feb 3 — should NOT be available
-3. Complete allocation A
-4. Try again — Vehicle X and Driver Y should now be available
-5. Verify cancelled allocations don't block resources
+## Testing
+1. Create an allocation with a vehicle and driver
+2. Open AllocationDialog for another request on the same date
+3. Verify the assigned vehicle/driver appears disabled with "Busy" badge
+4. Hover and verify tooltip shows correct trip details
+5. Verify available resources can still be selected normally
