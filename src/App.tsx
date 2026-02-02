@@ -15,6 +15,8 @@ import Locations from "./pages/Locations";
 import Vehicles from "./pages/Vehicles";
 import Drivers from "./pages/Drivers";
 import Users from "./pages/Users";
+import Requests from "./pages/Requests";
+import Approvals from "./pages/Approvals";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +41,26 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Travel Requests - All authenticated users */}
+            <Route
+              path="/requests"
+              element={
+                <ProtectedRoute>
+                  <Requests />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Approvals - Approvers only */}
+            <Route
+              path="/approvals"
+              element={
+                <ProtectedRoute allowedRoles={['approver', 'group_admin']}>
+                  <Approvals />
                 </ProtectedRoute>
               }
             />

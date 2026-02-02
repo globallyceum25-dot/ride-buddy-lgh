@@ -205,6 +205,154 @@ export type Database = {
         }
         Relationships: []
       }
+      request_history: {
+        Row: {
+          action: string
+          created_at: string
+          from_status: Database["public"]["Enums"]["request_status"] | null
+          id: string
+          notes: string | null
+          performed_by: string | null
+          request_id: string
+          to_status: Database["public"]["Enums"]["request_status"] | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["request_status"] | null
+          id?: string
+          notes?: string | null
+          performed_by?: string | null
+          request_id: string
+          to_status?: Database["public"]["Enums"]["request_status"] | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          from_status?: Database["public"]["Enums"]["request_status"] | null
+          id?: string
+          notes?: string | null
+          performed_by?: string | null
+          request_id?: string
+          to_status?: Database["public"]["Enums"]["request_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_history_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "travel_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      request_passengers: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          name: string
+          phone: string | null
+          request_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          name: string
+          phone?: string | null
+          request_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          name?: string
+          phone?: string | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_passengers_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "travel_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      travel_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          approver_id: string | null
+          cost_center: string | null
+          created_at: string
+          dropoff_location: string
+          id: string
+          notes: string | null
+          passenger_count: number
+          pickup_datetime: string
+          pickup_location: string
+          priority: Database["public"]["Enums"]["request_priority"]
+          purpose: string
+          rejection_reason: string | null
+          request_number: string | null
+          requester_id: string
+          return_datetime: string | null
+          special_requirements: string | null
+          status: Database["public"]["Enums"]["request_status"]
+          trip_type: Database["public"]["Enums"]["trip_type"]
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approver_id?: string | null
+          cost_center?: string | null
+          created_at?: string
+          dropoff_location: string
+          id?: string
+          notes?: string | null
+          passenger_count?: number
+          pickup_datetime: string
+          pickup_location: string
+          priority?: Database["public"]["Enums"]["request_priority"]
+          purpose: string
+          rejection_reason?: string | null
+          request_number?: string | null
+          requester_id: string
+          return_datetime?: string | null
+          special_requirements?: string | null
+          status?: Database["public"]["Enums"]["request_status"]
+          trip_type?: Database["public"]["Enums"]["trip_type"]
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approver_id?: string | null
+          cost_center?: string | null
+          created_at?: string
+          dropoff_location?: string
+          id?: string
+          notes?: string | null
+          passenger_count?: number
+          pickup_datetime?: string
+          pickup_location?: string
+          priority?: Database["public"]["Enums"]["request_priority"]
+          purpose?: string
+          rejection_reason?: string | null
+          request_number?: string | null
+          requester_id?: string
+          return_datetime?: string | null
+          special_requirements?: string | null
+          status?: Database["public"]["Enums"]["request_status"]
+          trip_type?: Database["public"]["Enums"]["trip_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_locations: {
         Row: {
           created_at: string
@@ -340,6 +488,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_request: {
+        Args: { _request_id: string; _user_id: string }
+        Returns: boolean
+      }
       get_user_roles: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"][]
@@ -364,6 +516,17 @@ export type Database = {
       fuel_type: "petrol" | "diesel" | "electric" | "hybrid" | "cng"
       license_type: "light" | "heavy" | "commercial"
       ownership_type: "owned" | "leased" | "rented"
+      request_priority: "normal" | "urgent" | "vip"
+      request_status:
+        | "draft"
+        | "pending_approval"
+        | "approved"
+        | "rejected"
+        | "allocated"
+        | "in_progress"
+        | "completed"
+        | "cancelled"
+      trip_type: "one_way" | "round_trip" | "multi_stop"
       vehicle_status:
         | "available"
         | "in_trip"
@@ -509,6 +672,18 @@ export const Constants = {
       fuel_type: ["petrol", "diesel", "electric", "hybrid", "cng"],
       license_type: ["light", "heavy", "commercial"],
       ownership_type: ["owned", "leased", "rented"],
+      request_priority: ["normal", "urgent", "vip"],
+      request_status: [
+        "draft",
+        "pending_approval",
+        "approved",
+        "rejected",
+        "allocated",
+        "in_progress",
+        "completed",
+        "cancelled",
+      ],
+      trip_type: ["one_way", "round_trip", "multi_stop"],
       vehicle_status: [
         "available",
         "in_trip",
