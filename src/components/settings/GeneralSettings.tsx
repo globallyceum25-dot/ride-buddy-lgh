@@ -130,14 +130,17 @@ export function GeneralSettings() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Default Location</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={(val) => field.onChange(val === "none" ? "" : val)} 
+                    value={field.value || "none"}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select default location" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {activeLocations.map((location) => (
                         <SelectItem key={location.id} value={location.id}>
                           {location.name}
