@@ -168,11 +168,24 @@ export function RequestDetailDialog({
                     <User className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Requested By</p>
-                      <p className="text-sm text-muted-foreground">
-                        {request.requester?.full_name} ({request.requester?.email})
-                      </p>
-                      {request.requester?.department && (
-                        <p className="text-xs text-muted-foreground">{request.requester.department}</p>
+                      {request.is_guest_request ? (
+                        <>
+                          <p className="text-sm text-muted-foreground">
+                            {request.guest_name || 'Guest'} ({request.guest_email || 'No email'})
+                          </p>
+                          {request.guest_employee_id && (
+                            <p className="text-xs text-muted-foreground">Employee ID: {request.guest_employee_id}</p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm text-muted-foreground">
+                            {request.requester?.full_name} ({request.requester?.email})
+                          </p>
+                          {request.requester?.department && (
+                            <p className="text-xs text-muted-foreground">{request.requester.department}</p>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
