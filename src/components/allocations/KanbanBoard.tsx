@@ -13,6 +13,7 @@ import {
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { format } from 'date-fns';
+import { Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { KanbanColumn } from './KanbanColumn';
 import { AllocationCard } from './AllocationCard';
@@ -373,6 +374,11 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
 
   const activeAllocation = activeId ? findAllocation(activeId) : null;
 
+  // Calculate pool count for the currently dragged allocation
+  const dragPoolCount = activeAllocation?.pool_id
+    ? filteredAllocations.filter((a) => a.pool_id === activeAllocation.pool_id).length
+    : undefined;
+
   // Get the allocation to show in dialog (single or first of pool)
   const dialogAllocation = trackingPool
     ? trackingPool.allocations[0]
@@ -419,10 +425,19 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
 
         <DragOverlay>
           {activeAllocation && (
-            <AllocationCard
-              allocation={activeAllocation}
-              isDragging
-            />
+            <div className="relative">
+              {/* Pool count badge */}
+              {dragPoolCount && dragPoolCount > 1 && (
+                <div className="absolute -top-3 -right-2 z-10 flex items-center gap-1 bg-accent text-accent-foreground px-2 py-1 rounded-full text-xs font-semibold shadow-lg animate-pulse">
+                  <Users className="h-3 w-3" />
+                  Moving {dragPoolCount} trips
+                </div>
+              )}
+              <AllocationCard
+                allocation={activeAllocation}
+                isDragging
+              />
+            </div>
           )}
         </DragOverlay>
       </DndContext>
