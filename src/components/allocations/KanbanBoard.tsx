@@ -291,7 +291,13 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
   };
 
   const handleCancel = (allocation: Allocation) => {
-    if (confirm('Are you sure you want to cancel this allocation?')) {
+    // Individual cancellation - even for pooled trips
+    const isPooled = !!allocation.pool_id;
+    const message = isPooled
+      ? 'This will cancel only this allocation, not the entire pool. The request will return to "Approved" status. Continue?'
+      : 'Are you sure you want to cancel this allocation? The request will return to "Approved" status.';
+    
+    if (confirm(message)) {
       cancelAllocation.mutate(allocation.id);
     }
   };
