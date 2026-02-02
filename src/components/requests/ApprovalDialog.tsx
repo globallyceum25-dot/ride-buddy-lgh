@@ -111,11 +111,23 @@ export function ApprovalDialog({
                 <div className="flex items-center gap-3">
                   <User className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium">{request.requester?.full_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {request.requester?.email}
-                      {request.requester?.department && ` • ${request.requester.department}`}
-                    </p>
+                    {request.is_guest_request ? (
+                      <>
+                        <p className="font-medium">{request.guest_name || 'Guest'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {request.guest_email || 'No email'}
+                          {request.guest_employee_id && ` • ID: ${request.guest_employee_id}`}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium">{request.requester?.full_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {request.requester?.email}
+                          {request.requester?.department && ` • ${request.requester.department}`}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
