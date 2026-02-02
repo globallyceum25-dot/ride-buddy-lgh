@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
 import { 
   Clock, 
@@ -13,6 +13,11 @@ import {
   X,
   Gauge
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import {
@@ -71,8 +76,11 @@ export default function Allocations() {
   const selectedRequestObjects = pendingRequests.filter(r => selectedRequests.includes(r.id));
   
   // Check if selected requests can be merged
-  const canMerge = selectedRequests.length >= 2 && 
-    checkPoolCompatibility(selectedRequestObjects).compatible;
+  const mergeCompatibility = useMemo(() => 
+    checkPoolCompatibility(selectedRequestObjects),
+    [selectedRequestObjects]
+  );
+  const canMerge = selectedRequests.length >= 2 && mergeCompatibility.compatible;
 
   const toggleRequestSelection = (id: string) => {
     setSelectedRequests(prev => 
@@ -206,15 +214,26 @@ export default function Allocations() {
                       </p>
                     )}
                     {selectedRequests.length >= 2 && (
-                      <Button 
-                        onClick={() => setShowMergeDialog(true)}
-                        disabled={!canMerge}
-                        variant="outline"
-                        className="gap-2"
-                      >
-                        <Merge className="h-4 w-4" />
-                        Merge Selected ({selectedRequests.length})
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <Button 
+                              onClick={() => setShowMergeDialog(true)}
+                              disabled={!canMerge}
+                              variant="outline"
+                              className="gap-2"
+                            >
+                              <Merge className="h-4 w-4" />
+                              Merge Selected ({selectedRequests.length})
+                            </Button>
+                          </span>
+                        </TooltipTrigger>
+                        {!canMerge && mergeCompatibility.reason && (
+                          <TooltipContent>
+                            <p>{mergeCompatibility.reason}</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
                     )}
                   </div>
                 )}
