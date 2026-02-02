@@ -169,6 +169,7 @@ export default function Requests() {
                       <TableHead>Purpose</TableHead>
                       <TableHead>Route</TableHead>
                       <TableHead>Date</TableHead>
+                      <TableHead>Approver</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -197,6 +198,11 @@ export default function Requests() {
                           <span className="text-muted-foreground text-xs">
                             {format(new Date(request.pickup_datetime), 'h:mm a')}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          {request.approver?.full_name || (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <RequestStatusBadge status={request.status} />
