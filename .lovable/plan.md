@@ -1,215 +1,170 @@
 
-# Phase 2: Master Data Management - Implementation Plan
+# User Management Page - Implementation Plan
 
 ## Overview
-Build three management screens (Locations, Vehicles, Drivers) with full CRUD operations, data tables, and proper role-based access control.
+Create a comprehensive user management interface that allows Group Admins to create new user accounts, view all users, edit profiles, and manage role assignments.
 
 ---
 
-## Database Schema Changes
+## Architecture
 
-### 1. Create Enums for Vehicles and Drivers
+### Backend: Supabase Edge Function
+Since user creation requires the Admin API (service role key), we need an edge function to securely create users.
 
-```sql
--- Vehicle status enum
-CREATE TYPE vehicle_status AS ENUM ('available', 'in_trip', 'maintenance', 'breakdown', 'retired');
+**Function: `admin-create-user`**
+- Validates that the caller is a group_admin (using JWT verification)
+- Creates auth user with `supabase.auth.admin.createUser()`
+- The existing database trigger `handle_new_user` auto-creates the profile
+- Inserts role assignments to `user_roles` table
+- Optionally assigns primary location
 
--- Vehicle type enum  
-CREATE TYPE vehicle_type AS ENUM ('sedan', 'suv', 'van', 'minibus', 'bus', 'other');
+### Frontend Components
 
--- Fuel type enum
-CREATE TYPE fuel_type AS ENUM ('petrol', 'diesel', 'electric', 'hybrid', 'cng');
-
--- Ownership type enum
-CREATE TYPE ownership_type AS ENUM ('owned', 'leased', 'rented');
-
--- Driver status enum
-CREATE TYPE driver_status AS ENUM ('available', 'on_trip', 'on_leave', 'inactive');
-
--- License type enum
-CREATE TYPE license_type AS ENUM ('light', 'heavy', 'commercial');
+```text
+src/
+├── pages/
+│   └── Users.tsx                    # Main user management page
+├── components/
+│   └── users/
+│       ├── CreateUserDialog.tsx     # Create user form (calls edge function)
+│       ├── EditUserDialog.tsx       # Edit profile form
+│       └── RoleManagementDialog.tsx # Role assignment dialog
+└── hooks/
+    └── useUsers.ts                  # React Query hooks
 ```
 
-### 2. Vehicles Table
+---
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | Primary key |
-| registration_number | text | Unique, required |
-| make | text | e.g., Toyota |
-| model | text | e.g., Hiace |
-| year | integer | Manufacturing year |
-| vehicle_type | vehicle_type | Enum |
-| capacity | integer | Passenger seats |
-| fuel_type | fuel_type | Enum |
-| ownership | ownership_type | Owned/Leased/Rented |
-| status | vehicle_status | Default: available |
-| location_id | uuid | FK to locations (home base) |
-| insurance_expiry | date | For alerts |
-| registration_expiry | date | For alerts |
-| last_service_date | date | Maintenance tracking |
-| next_service_due | date | Maintenance alerts |
-| odometer | integer | Current reading |
-| notes | text | Optional |
-| is_active | boolean | Soft delete |
-| created_at | timestamptz | Auto |
-| updated_at | timestamptz | Auto-updated |
+## Database Considerations
 
-### 3. Drivers Table
+**No schema changes required** - existing tables support all features:
+- `profiles` - User profile data
+- `user_roles` - Role assignments (separate table as required)
+- `user_locations` - Location assignments
 
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | Primary key |
-| user_id | uuid | FK to profiles (links to user account) |
-| employee_id | text | Company ID |
-| license_number | text | Required |
-| license_type | license_type | Light/Heavy/Commercial |
-| license_expiry | date | For alerts |
-| status | driver_status | Default: available |
-| location_id | uuid | FK to locations (assigned base) |
-| is_floating | boolean | Can work any location |
-| emergency_contact | text | Phone number |
-| blood_group | text | Optional |
-| date_joined | date | Employment start |
-| notes | text | Optional |
-| is_active | boolean | Soft delete |
-| created_at | timestamptz | Auto |
-| updated_at | timestamptz | Auto-updated |
-
-### 4. RLS Policies
-
-**Vehicles:**
-- Admins (`group_admin`, `location_coordinator`) can manage vehicles
-- All authenticated users can view active vehicles
-
-**Drivers:**
-- Admins can manage driver records
-- Drivers can view their own record
-- All authenticated users can view active drivers
+**RLS policies already in place:**
+- Group admins can manage all profiles, roles, and location assignments
+- Users can view their own data
 
 ---
 
-## Frontend Implementation
+## Implementation Details
 
-### Shared Components
+### 1. Edge Function: `admin-create-user`
 
-**`src/components/shared/DataTable.tsx`**
-- Reusable table component with sorting, filtering, pagination
-- Search functionality
-- Row actions (Edit, Delete, View)
-- Status badges
-- Used across all three management pages
+**Request Body:**
+```typescript
+{
+  email: string;
+  password: string;
+  full_name: string;
+  phone?: string;
+  employee_id?: string;
+  department?: string;
+  cost_center?: string;
+  roles: AppRole[];           // Array of roles to assign
+  primary_location_id?: string;
+}
+```
 
-**`src/components/shared/StatusBadge.tsx`**
-- Color-coded status indicators
-- Consistent styling across the app
+**Security:**
+- Verifies JWT token from Authorization header
+- Checks caller has `group_admin` role using `is_admin()` database function
+- Returns 403 if unauthorized
 
-### Locations Page (`/locations`)
+**Process:**
+1. Validate request body with zod
+2. Create auth user with `supabase.auth.admin.createUser()`
+3. Update profile with additional fields (trigger creates basic profile)
+4. Insert roles into `user_roles` table
+5. Insert location assignment to `user_locations` if provided
+6. Return created user data
 
-**Components:**
-- `src/pages/Locations.tsx` - Main page
-- `src/components/locations/LocationTable.tsx` - Data table
-- `src/components/locations/LocationDialog.tsx` - Create/Edit form
+### 2. React Query Hook: `useUsers.ts`
 
-**Features:**
-- View all locations in a sortable table
-- Add new location with form validation
-- Edit existing locations
-- Toggle active/inactive status
-- Display assigned coordinators count
-- Show operating hours
+**Queries:**
+- `useUsers()` - Fetch all users with profiles, roles, and locations
+  - Joins: profiles + user_roles + user_locations + locations
+  - Returns aggregated data per user
 
-**Form Fields:**
-- Name (required)
-- Code (required, unique)
-- Address
-- City
-- GPS Coordinates (lat/lng)
-- Operating Hours (start/end time)
+**Mutations:**
+- `useCreateUser()` - Calls edge function to create user
+- `useUpdateProfile()` - Updates profile via Supabase client
+- `useAddUserRole()` - Inserts role into user_roles
+- `useRemoveUserRole()` - Deletes role from user_roles
+- `useToggleUserActive()` - Sets is_active on profile
 
-### Vehicles Page (`/vehicles`)
-
-**Components:**
-- `src/pages/Vehicles.tsx` - Main page
-- `src/components/vehicles/VehicleTable.tsx` - Data table
-- `src/components/vehicles/VehicleDialog.tsx` - Create/Edit form
-
-**Features:**
-- View all vehicles with status indicators
-- Filter by status, type, location
-- Add/Edit vehicle details
-- Track maintenance schedules
-- Alert badges for expiring documents
-- Odometer tracking
-
-**Form Fields:**
-- Registration Number (required, unique)
-- Make & Model
-- Year
-- Vehicle Type (dropdown)
-- Capacity (number)
-- Fuel Type (dropdown)
-- Ownership Type (dropdown)
-- Home Location (dropdown)
-- Insurance Expiry Date
-- Registration Expiry Date
-- Last Service / Next Service Due
-- Current Odometer
-
-### Drivers Page (`/drivers`)
-
-**Components:**
-- `src/pages/Drivers.tsx` - Main page
-- `src/components/drivers/DriverTable.tsx` - Data table
-- `src/components/drivers/DriverDialog.tsx` - Create/Edit form
+### 3. Users Page: `src/pages/Users.tsx`
 
 **Features:**
-- View all drivers with status
-- Filter by status, location
-- Link driver to existing user account
-- Track license expiry
-- Show availability status
-- Mark as floating driver
+- Data table with columns: Name, Email, Roles, Location, Department, Status, Actions
+- Search by name, email, or employee ID
+- Filter by role (dropdown)
+- Filter by status (active/inactive)
+- Add User button opens CreateUserDialog
+- Row actions: Edit, Manage Roles, Deactivate/Reactivate
+
+**Empty State:**
+- Icon, message, and CTA to add first user
+
+### 4. CreateUserDialog Component
+
+**Form Fields (with zod validation):**
+- Email (required, valid email format)
+- Temporary Password (required, min 8 chars)
+- Full Name (required)
+- Phone (optional)
+- Employee ID (optional)
+- Department (optional)
+- Cost Center (optional)
+- Roles (multi-select checkboxes)
+- Primary Location (dropdown from locations)
+
+**Behavior:**
+- Calls edge function on submit
+- Shows loading state
+- Displays success/error toast
+- Closes and refreshes user list on success
+
+### 5. EditUserDialog Component
 
 **Form Fields:**
-- Link to User Account (dropdown from profiles with driver role)
-- License Number (required)
-- License Type (dropdown)
-- License Expiry Date
-- Assigned Location (dropdown)
-- Is Floating (checkbox)
-- Emergency Contact
-- Blood Group
-- Date Joined
+- Full Name, Phone, Employee ID, Department, Cost Center
+- Active toggle (for deactivation)
+- Note: Email cannot be changed (auth identifier)
+
+**Behavior:**
+- Pre-populates with existing data
+- Updates directly via Supabase client (RLS allows group_admin)
+- Shows toast on success/error
+
+### 6. RoleManagementDialog Component
+
+**Display:**
+- User name and email at top
+- List of all available roles with checkboxes
+- Current roles are pre-checked
+
+**Behavior:**
+- Toggle roles on/off immediately (optimistic updates)
+- Direct insert/delete on user_roles table
+- Shows role descriptions for clarity
 
 ---
 
-## Data Hooks (React Query)
-
-**`src/hooks/useLocations.ts`**
-- `useLocations()` - Fetch all locations
-- `useCreateLocation()` - Create mutation
-- `useUpdateLocation()` - Update mutation
-- `useDeleteLocation()` - Delete mutation
-
-**`src/hooks/useVehicles.ts`**
-- `useVehicles()` - Fetch all vehicles with location join
-- `useCreateVehicle()` - Create mutation
-- `useUpdateVehicle()` - Update mutation
-
-**`src/hooks/useDrivers.ts`**
-- `useDrivers()` - Fetch all drivers with profile/location join
-- `useCreateDriver()` - Create mutation
-- `useUpdateDriver()` - Update mutation
-
----
-
-## Route Updates
+## Route Registration
 
 Add to `src/App.tsx`:
-- `/locations` - Group Admin only
-- `/vehicles` - Location Coordinator & Group Admin
-- `/drivers` - Location Coordinator & Group Admin
+```tsx
+<Route
+  path="/users"
+  element={
+    <ProtectedRoute allowedRoles={['group_admin']}>
+      <Users />
+    </ProtectedRoute>
+  }
+/>
+```
 
 ---
 
@@ -217,46 +172,37 @@ Add to `src/App.tsx`:
 
 | File | Purpose |
 |------|---------|
-| `src/pages/Locations.tsx` | Location management page |
-| `src/pages/Vehicles.tsx` | Vehicle management page |
-| `src/pages/Drivers.tsx` | Driver management page |
-| `src/components/locations/LocationTable.tsx` | Location data table |
-| `src/components/locations/LocationDialog.tsx` | Location form dialog |
-| `src/components/vehicles/VehicleTable.tsx` | Vehicle data table |
-| `src/components/vehicles/VehicleDialog.tsx` | Vehicle form dialog |
-| `src/components/drivers/DriverTable.tsx` | Driver data table |
-| `src/components/drivers/DriverDialog.tsx` | Driver form dialog |
-| `src/hooks/useLocations.ts` | Location data hooks |
-| `src/hooks/useVehicles.ts` | Vehicle data hooks |
-| `src/hooks/useDrivers.ts` | Driver data hooks |
+| `supabase/functions/admin-create-user/index.ts` | Edge function for secure user creation |
+| `src/pages/Users.tsx` | Main user management page |
+| `src/hooks/useUsers.ts` | React Query data hooks |
+| `src/components/users/CreateUserDialog.tsx` | Create user form dialog |
+| `src/components/users/EditUserDialog.tsx` | Edit profile dialog |
+| `src/components/users/RoleManagementDialog.tsx` | Role assignment dialog |
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/App.tsx` | Add 3 new protected routes |
+| `src/App.tsx` | Add `/users` protected route |
 
 ---
 
-## Implementation Order
+## Security Checklist
 
-1. **Database Migration** - Create vehicles and drivers tables with enums and RLS
-2. **Locations Page** - Build first (table exists, simpler implementation)
-3. **Vehicles Page** - Build with all tracking features
-4. **Drivers Page** - Build with user account linking
-5. **Route Registration** - Add all routes to App.tsx
+- Edge function validates admin role server-side (not client-side)
+- Service role key only used in edge function (never exposed to client)
+- All client-side operations go through RLS-protected tables
+- Input validation with zod on both client and server
+- No sensitive data logged to console
+- Password requirements enforced (min 8 characters)
 
 ---
 
-## UI Design Notes
+## UI/UX Notes
 
-- Clean data tables with hover states
-- Status badges with distinct colors:
-  - Available: Green
-  - In Trip/On Trip: Blue
-  - Maintenance/On Leave: Yellow
-  - Breakdown/Inactive: Red
-- Alert badges for expiring documents (within 30 days)
-- Responsive design for tablet/mobile
-- Empty states with clear CTAs
+- Follow existing patterns from Locations/Vehicles pages
+- Use StatusBadge component for active/inactive status
+- Role badges with distinct colors (already defined in DashboardLayout)
+- Clear empty states with helpful CTAs
 - Toast notifications for all actions
+- Loading states during async operations
