@@ -29,6 +29,13 @@ export interface TravelRequest {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Guest request fields
+  is_guest_request: boolean | null;
+  guest_name: string | null;
+  guest_email: string | null;
+  guest_phone: string | null;
+  guest_employee_id: string | null;
+  form_link_id: string | null;
   requester?: {
     full_name: string;
     email: string;
