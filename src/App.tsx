@@ -11,6 +11,9 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
+import Locations from "./pages/Locations";
+import Vehicles from "./pages/Vehicles";
+import Drivers from "./pages/Drivers";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +38,35 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Master Data Management - Admin only */}
+            <Route
+              path="/locations"
+              element={
+                <ProtectedRoute allowedRoles={['group_admin']}>
+                  <Locations />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Vehicles & Drivers - Admins and Coordinators */}
+            <Route
+              path="/vehicles"
+              element={
+                <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
+                  <Vehicles />
+                </ProtectedRoute>
+              }
+            />
+            
+            <Route
+              path="/drivers"
+              element={
+                <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
+                  <Drivers />
                 </ProtectedRoute>
               }
             />

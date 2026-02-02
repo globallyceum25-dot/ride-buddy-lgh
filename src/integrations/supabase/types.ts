@@ -53,6 +53,71 @@ export type Database = {
         }
         Relationships: []
       }
+      drivers: {
+        Row: {
+          blood_group: string | null
+          created_at: string
+          date_joined: string | null
+          emergency_contact: string | null
+          employee_id: string | null
+          id: string
+          is_active: boolean
+          is_floating: boolean | null
+          license_expiry: string | null
+          license_number: string
+          license_type: Database["public"]["Enums"]["license_type"] | null
+          location_id: string | null
+          notes: string | null
+          status: Database["public"]["Enums"]["driver_status"] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blood_group?: string | null
+          created_at?: string
+          date_joined?: string | null
+          emergency_contact?: string | null
+          employee_id?: string | null
+          id?: string
+          is_active?: boolean
+          is_floating?: boolean | null
+          license_expiry?: string | null
+          license_number: string
+          license_type?: Database["public"]["Enums"]["license_type"] | null
+          location_id?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["driver_status"] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blood_group?: string | null
+          created_at?: string
+          date_joined?: string | null
+          emergency_contact?: string | null
+          employee_id?: string | null
+          id?: string
+          is_active?: boolean
+          is_floating?: boolean | null
+          license_expiry?: string | null
+          license_number?: string
+          license_type?: Database["public"]["Enums"]["license_type"] | null
+          location_id?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["driver_status"] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drivers_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string | null
@@ -193,6 +258,83 @@ export type Database = {
         }
         Relationships: []
       }
+      vehicles: {
+        Row: {
+          capacity: number | null
+          created_at: string
+          fuel_type: Database["public"]["Enums"]["fuel_type"] | null
+          id: string
+          insurance_expiry: string | null
+          is_active: boolean
+          last_service_date: string | null
+          location_id: string | null
+          make: string | null
+          model: string | null
+          next_service_due: string | null
+          notes: string | null
+          odometer: number | null
+          ownership: Database["public"]["Enums"]["ownership_type"] | null
+          registration_expiry: string | null
+          registration_number: string
+          status: Database["public"]["Enums"]["vehicle_status"] | null
+          updated_at: string
+          vehicle_type: Database["public"]["Enums"]["vehicle_type"] | null
+          year: number | null
+        }
+        Insert: {
+          capacity?: number | null
+          created_at?: string
+          fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
+          id?: string
+          insurance_expiry?: string | null
+          is_active?: boolean
+          last_service_date?: string | null
+          location_id?: string | null
+          make?: string | null
+          model?: string | null
+          next_service_due?: string | null
+          notes?: string | null
+          odometer?: number | null
+          ownership?: Database["public"]["Enums"]["ownership_type"] | null
+          registration_expiry?: string | null
+          registration_number: string
+          status?: Database["public"]["Enums"]["vehicle_status"] | null
+          updated_at?: string
+          vehicle_type?: Database["public"]["Enums"]["vehicle_type"] | null
+          year?: number | null
+        }
+        Update: {
+          capacity?: number | null
+          created_at?: string
+          fuel_type?: Database["public"]["Enums"]["fuel_type"] | null
+          id?: string
+          insurance_expiry?: string | null
+          is_active?: boolean
+          last_service_date?: string | null
+          location_id?: string | null
+          make?: string | null
+          model?: string | null
+          next_service_due?: string | null
+          notes?: string | null
+          odometer?: number | null
+          ownership?: Database["public"]["Enums"]["ownership_type"] | null
+          registration_expiry?: string | null
+          registration_number?: string
+          status?: Database["public"]["Enums"]["vehicle_status"] | null
+          updated_at?: string
+          vehicle_type?: Database["public"]["Enums"]["vehicle_type"] | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicles_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -218,6 +360,17 @@ export type Database = {
         | "approver"
         | "location_coordinator"
         | "group_admin"
+      driver_status: "available" | "on_trip" | "on_leave" | "inactive"
+      fuel_type: "petrol" | "diesel" | "electric" | "hybrid" | "cng"
+      license_type: "light" | "heavy" | "commercial"
+      ownership_type: "owned" | "leased" | "rented"
+      vehicle_status:
+        | "available"
+        | "in_trip"
+        | "maintenance"
+        | "breakdown"
+        | "retired"
+      vehicle_type: "sedan" | "suv" | "van" | "minibus" | "bus" | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -352,6 +505,18 @@ export const Constants = {
         "location_coordinator",
         "group_admin",
       ],
+      driver_status: ["available", "on_trip", "on_leave", "inactive"],
+      fuel_type: ["petrol", "diesel", "electric", "hybrid", "cng"],
+      license_type: ["light", "heavy", "commercial"],
+      ownership_type: ["owned", "leased", "rented"],
+      vehicle_status: [
+        "available",
+        "in_trip",
+        "maintenance",
+        "breakdown",
+        "retired",
+      ],
+      vehicle_type: ["sedan", "suv", "van", "minibus", "bus", "other"],
     },
   },
 } as const
