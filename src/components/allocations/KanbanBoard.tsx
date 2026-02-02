@@ -22,6 +22,7 @@ import {
   AllocationStatus,
   useAllocations,
   useUpdateAllocationStatus,
+  useBulkUpdateAllocationStatus,
   useCancelAllocation,
 } from '@/hooks/useAllocations';
 
@@ -74,9 +75,16 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
   const [overId, setOverId] = useState<string | null>(null);
   const [trackingAllocation, setTrackingAllocation] = useState<Allocation | null>(null);
   const [trackingMode, setTrackingMode] = useState<'start' | 'complete'>('start');
+  
+  // State for tracking pooled trips
+  const [trackingPool, setTrackingPool] = useState<{
+    allocations: Allocation[];
+    targetStatus: AllocationStatus;
+  } | null>(null);
 
   const { data: allocations = [], isLoading } = useAllocations();
   const updateStatus = useUpdateAllocationStatus();
+  const bulkUpdateStatus = useBulkUpdateAllocationStatus();
   const cancelAllocation = useCancelAllocation();
 
   const sensors = useSensors(
@@ -206,7 +214,41 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
       return;
     }
 
-    // Check if transition requires data
+    // Handle pooled trips - move all together
+    if (activeAllocation.pool_id) {
+      const poolAllocations = filteredAllocations.filter(
+        (a) => a.pool_id === activeAllocation.pool_id
+      );
+
+      // Verify all pool allocations are in the same status
+      const allSameStatus = poolAllocations.every(
+        (a) => a.status === activeAllocation.status
+      );
+      if (!allSameStatus) {
+        toast.error('Pool has allocations in different statuses');
+        return;
+      }
+
+      const allIds = poolAllocations.map((a) => a.id);
+
+      // Check if transition requires data
+      if (requiresData(targetStatus)) {
+        if (targetStatus === 'in_progress') {
+          setTrackingPool({ allocations: poolAllocations, targetStatus });
+          setTrackingMode('start');
+        } else if (targetStatus === 'completed') {
+          setTrackingPool({ allocations: poolAllocations, targetStatus });
+          setTrackingMode('complete');
+        }
+        return;
+      }
+
+      // Bulk update all pool allocations
+      bulkUpdateStatus.mutate({ ids: allIds, status: targetStatus });
+      return;
+    }
+
+    // Single allocation update
     if (requiresData(targetStatus)) {
       if (targetStatus === 'in_progress') {
         setTrackingAllocation(activeAllocation);
@@ -223,12 +265,28 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
   };
 
   const handleStartTrip = (allocation: Allocation) => {
-    setTrackingAllocation(allocation);
+    // Check if this allocation is part of a pool
+    if (allocation.pool_id) {
+      const poolAllocations = filteredAllocations.filter(
+        (a) => a.pool_id === allocation.pool_id
+      );
+      setTrackingPool({ allocations: poolAllocations, targetStatus: 'in_progress' });
+    } else {
+      setTrackingAllocation(allocation);
+    }
     setTrackingMode('start');
   };
 
   const handleCompleteTrip = (allocation: Allocation) => {
-    setTrackingAllocation(allocation);
+    // Check if this allocation is part of a pool
+    if (allocation.pool_id) {
+      const poolAllocations = filteredAllocations.filter(
+        (a) => a.pool_id === allocation.pool_id
+      );
+      setTrackingPool({ allocations: poolAllocations, targetStatus: 'completed' });
+    } else {
+      setTrackingAllocation(allocation);
+    }
     setTrackingMode('complete');
   };
 
@@ -239,7 +297,16 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
   };
 
   const handleDispatch = (allocation: Allocation) => {
-    updateStatus.mutate({ id: allocation.id, status: 'dispatched' });
+    // Check if this allocation is part of a pool
+    if (allocation.pool_id) {
+      const poolAllocations = filteredAllocations.filter(
+        (a) => a.pool_id === allocation.pool_id
+      );
+      const allIds = poolAllocations.map((a) => a.id);
+      bulkUpdateStatus.mutate({ ids: allIds, status: 'dispatched' });
+    } else {
+      updateStatus.mutate({ id: allocation.id, status: 'dispatched' });
+    }
   };
 
   const handleTrackingSubmit = (data: {
@@ -248,6 +315,29 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
     actual_pickup?: string;
     actual_dropoff?: string;
   }) => {
+    // Handle pooled trip tracking
+    if (trackingPool) {
+      const newStatus = trackingPool.targetStatus;
+      const allIds = trackingPool.allocations.map((a) => a.id);
+      const vehicle_id = trackingPool.allocations[0]?.vehicle_id;
+
+      bulkUpdateStatus.mutate(
+        {
+          ids: allIds,
+          status: newStatus,
+          vehicle_id,
+          ...data,
+        },
+        {
+          onSuccess: () => {
+            setTrackingPool(null);
+          },
+        }
+      );
+      return;
+    }
+
+    // Handle single allocation tracking
     if (!trackingAllocation) return;
 
     const newStatus: AllocationStatus =
@@ -268,7 +358,21 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
     );
   };
 
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      setTrackingAllocation(null);
+      setTrackingPool(null);
+    }
+  };
+
   const activeAllocation = activeId ? findAllocation(activeId) : null;
+
+  // Get the allocation to show in dialog (single or first of pool)
+  const dialogAllocation = trackingPool
+    ? trackingPool.allocations[0]
+    : trackingAllocation;
+
+  const dialogPoolCount = trackingPool ? trackingPool.allocations.length : undefined;
 
   if (isLoading) {
     return (
@@ -318,12 +422,13 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
       </DndContext>
 
       <TripTrackingDialog
-        open={!!trackingAllocation}
-        onOpenChange={(open) => !open && setTrackingAllocation(null)}
-        allocation={trackingAllocation}
+        open={!!dialogAllocation}
+        onOpenChange={handleDialogClose}
+        allocation={dialogAllocation}
         mode={trackingMode}
         onSubmit={handleTrackingSubmit}
-        isLoading={updateStatus.isPending}
+        isLoading={updateStatus.isPending || bulkUpdateStatus.isPending}
+        poolCount={dialogPoolCount}
       />
     </>
   );

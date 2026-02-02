@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Car, Gauge, MapPin, Clock } from 'lucide-react';
+import { Car, Gauge, MapPin, Clock, Users } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Allocation } from '@/hooks/useAllocations';
 
 interface TripTrackingDialogProps {
@@ -26,6 +27,7 @@ interface TripTrackingDialogProps {
     actual_dropoff?: string;
   }) => void;
   isLoading?: boolean;
+  poolCount?: number; // Number of allocations in the pool
 }
 
 export function TripTrackingDialog({
@@ -35,6 +37,7 @@ export function TripTrackingDialog({
   mode,
   onSubmit,
   isLoading,
+  poolCount,
 }: TripTrackingDialogProps) {
   const [odometer, setOdometer] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -85,6 +88,8 @@ export function TripTrackingDialog({
 
   if (!allocation) return null;
 
+  const isPooledTrip = poolCount && poolCount > 1;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
@@ -101,11 +106,21 @@ export function TripTrackingDialog({
                 Complete Trip
               </>
             )}
+            {isPooledTrip && (
+              <Badge variant="secondary" className="ml-2">
+                <Users className="h-3 w-3 mr-1" />
+                {poolCount} trips
+              </Badge>
+            )}
           </DialogTitle>
           <DialogDescription>
             {mode === 'start'
-              ? 'Record the starting odometer reading before departure'
-              : 'Record the ending odometer reading to complete the trip'}
+              ? isPooledTrip
+                ? `Record the starting odometer reading for ${poolCount} pooled trips`
+                : 'Record the starting odometer reading before departure'
+              : isPooledTrip
+                ? `Record the ending odometer reading to complete ${poolCount} pooled trips`
+                : 'Record the ending odometer reading to complete the trip'}
           </DialogDescription>
         </DialogHeader>
 
@@ -114,6 +129,9 @@ export function TripTrackingDialog({
           <div className="rounded-lg bg-muted p-3 space-y-2">
             <div className="flex items-center gap-2 text-sm">
               <span className="font-medium">{allocation.request?.request_number}</span>
+              {isPooledTrip && (
+                <span className="text-muted-foreground">+ {poolCount! - 1} more</span>
+              )}
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Car className="h-4 w-4" />
@@ -131,6 +149,16 @@ export function TripTrackingDialog({
               </div>
             )}
           </div>
+
+          {/* Pooled Trip Notice */}
+          {isPooledTrip && (
+            <div className="rounded-lg border border-info/50 bg-info/10 p-3">
+              <p className="text-sm text-info-foreground">
+                <Users className="h-4 w-4 inline mr-1" />
+                This odometer reading will be applied to all {poolCount} trips in this pool.
+              </p>
+            </div>
+          )}
 
           {/* Odometer Input */}
           <div className="space-y-2">
@@ -183,7 +211,15 @@ export function TripTrackingDialog({
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Saving...' : mode === 'start' ? 'Start Trip' : 'Complete Trip'}
+            {isLoading
+              ? 'Saving...'
+              : mode === 'start'
+                ? isPooledTrip
+                  ? `Start ${poolCount} Trips`
+                  : 'Start Trip'
+                : isPooledTrip
+                  ? `Complete ${poolCount} Trips`
+                  : 'Complete Trip'}
           </Button>
         </DialogFooter>
       </DialogContent>

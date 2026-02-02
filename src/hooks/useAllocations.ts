@@ -444,6 +444,74 @@ export function useUpdateAllocationStatus() {
   });
 }
 
+// Bulk update allocation statuses (for pooled trips)
+export function useBulkUpdateAllocationStatus() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      ids, 
+      status, 
+      vehicle_id,
+      ...updates 
+    }: { 
+      ids: string[]; 
+      status: AllocationStatus;
+      vehicle_id?: string | null;
+      actual_pickup?: string;
+      actual_dropoff?: string;
+      odometer_start?: number;
+      odometer_end?: number;
+    }) => {
+      // Update all allocations in the pool
+      const { data, error } = await supabase
+        .from('allocations')
+        .update({ status, ...updates })
+        .in('id', ids)
+        .select('id, request_id');
+      
+      if (error) throw error;
+      
+      // Update travel request statuses based on allocation status
+      type RequestStatus = 'draft' | 'pending_approval' | 'approved' | 'rejected' | 'allocated' | 'in_progress' | 'completed' | 'cancelled';
+      const requestStatusMap: Record<AllocationStatus, RequestStatus | null> = {
+        'dispatched': null,
+        'in_progress': 'in_progress',
+        'completed': 'completed',
+        'cancelled': null,
+        'scheduled': null,
+      };
+      
+      if (requestStatusMap[status] && data) {
+        const requestIds = data.map(a => a.request_id);
+        await supabase
+          .from('travel_requests')
+          .update({ status: requestStatusMap[status] })
+          .in('id', requestIds);
+      }
+      
+      // Update vehicle odometer when trip completes
+      if (status === 'completed' && updates.odometer_end && vehicle_id) {
+        await supabase
+          .from('vehicles')
+          .update({ odometer: updates.odometer_end })
+          .eq('id', vehicle_id);
+      }
+      
+      return data;
+    },
+    onSuccess: (_, { ids }) => {
+      queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      queryClient.invalidateQueries({ queryKey: ['requests'] });
+      queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      toast.success(`Updated ${ids.length} allocation${ids.length > 1 ? 's' : ''}`);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update allocations: ${error.message}`);
+    },
+  });
+}
+
 // Cancel allocation
 export function useCancelAllocation() {
   const queryClient = useQueryClient();
