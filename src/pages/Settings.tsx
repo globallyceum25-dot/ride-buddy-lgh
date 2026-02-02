@@ -1,10 +1,11 @@
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings as SettingsIcon, Building2, Wallet, ScrollText } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, Wallet, ScrollText, Link } from 'lucide-react';
 import { GeneralSettings } from '@/components/settings/GeneralSettings';
 import { DepartmentSettings } from '@/components/settings/DepartmentSettings';
 import { CostCenterSettings } from '@/components/settings/CostCenterSettings';
 import { AuditLogs } from '@/components/settings/AuditLogs';
+import { PublicFormLinks } from '@/components/settings/PublicFormLinks';
 
 export default function Settings() {
   return (
@@ -18,7 +19,7 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="general" className="space-y-4">
-          <TabsList>
+          <TabsList className="flex-wrap">
             <TabsTrigger value="general" className="gap-2">
               <SettingsIcon className="h-4 w-4" />
               General
@@ -30,6 +31,10 @@ export default function Settings() {
             <TabsTrigger value="cost-centers" className="gap-2">
               <Wallet className="h-4 w-4" />
               Cost Centers
+            </TabsTrigger>
+            <TabsTrigger value="form-links" className="gap-2">
+              <Link className="h-4 w-4" />
+              Form Links
             </TabsTrigger>
             <TabsTrigger value="audit" className="gap-2">
               <ScrollText className="h-4 w-4" />
@@ -47,6 +52,10 @@ export default function Settings() {
 
           <TabsContent value="cost-centers">
             <CostCenterSettings />
+          </TabsContent>
+
+          <TabsContent value="form-links">
+            <PublicFormLinks />
           </TabsContent>
 
           <TabsContent value="audit">

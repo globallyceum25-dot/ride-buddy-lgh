@@ -21,6 +21,7 @@ import Allocations from "./pages/Allocations";
 import TripSchedule from "./pages/TripSchedule";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
+import PublicRequestForm from "./pages/PublicRequestForm";
 
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
             {/* Public routes */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
+            <Route path="/request/:token" element={<PublicRequestForm />} />
 
             {/* Redirect root to dashboard */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
