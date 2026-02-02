@@ -25,6 +25,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useDrivers } from '@/hooks/useDrivers';
 import { useCreateTripPool, checkPoolCompatibility } from '@/hooks/useAllocations';
+import { useBusyResources } from '@/hooks/useBusyResources';
 
 interface Request {
   id: string;
@@ -58,6 +59,12 @@ export function MergeRequestsDialog({ open, onOpenChange, requests }: MergeReque
   const { data: drivers = [] } = useDrivers();
   const createTripPool = useCreateTripPool();
   
+  // Get the date from the first request for busy resource check
+  const requestDate = requests.length > 0 
+    ? format(new Date(requests[0].pickup_datetime), 'yyyy-MM-dd') 
+    : null;
+  const { data: busyResources } = useBusyResources(requestDate);
+  
   // Calculate total passengers
   const totalPassengers = useMemo(() => 
     requests.reduce((sum, r) => sum + r.passenger_count, 0),
@@ -74,14 +81,18 @@ export function MergeRequestsDialog({ open, onOpenChange, requests }: MergeReque
     [requests, vehicleCapacity]
   );
   
-  // Filter available vehicles with sufficient capacity
+  // Filter available vehicles with sufficient capacity (excluding those with active allocations)
   const availableVehicles = vehicles.filter(v => 
-    v.is_active && v.status === 'available' && 
-    (v.capacity ?? 0) >= totalPassengers
+    v.is_active && 
+    v.status === 'available' && 
+    (v.capacity ?? 0) >= totalPassengers &&
+    !busyResources?.busyVehicleIds.includes(v.id)
   );
   
   const availableDrivers = drivers.filter(d => 
-    d.is_active && d.status === 'available'
+    d.is_active && 
+    d.status === 'available' &&
+    !busyResources?.busyDriverIds.includes(d.id)
   );
   
   // Reset form and set defaults when dialog opens
@@ -217,7 +228,7 @@ export function MergeRequestsDialog({ open, onOpenChange, requests }: MergeReque
               <SelectContent>
                 {availableVehicles.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">
-                    No available vehicles with sufficient capacity ({totalPassengers}+ seats)
+                    No available vehicles — all are assigned to trips on this date
                   </div>
                 ) : (
                   availableVehicles.map((vehicle) => (
@@ -246,7 +257,7 @@ export function MergeRequestsDialog({ open, onOpenChange, requests }: MergeReque
               <SelectContent>
                 {availableDrivers.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground text-center">
-                    No available drivers
+                    No available drivers — all are assigned to trips on this date
                   </div>
                 ) : (
                   availableDrivers.map((driver) => (
