@@ -474,6 +474,38 @@ export type Database = {
           },
         ]
       }
+      request_stops: {
+        Row: {
+          created_at: string | null
+          id: string
+          location: string
+          request_id: string
+          stop_order: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          location: string
+          request_id: string
+          stop_order: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          location?: string
+          request_id?: string
+          stop_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_stops_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "travel_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       system_settings: {
         Row: {
           id: string

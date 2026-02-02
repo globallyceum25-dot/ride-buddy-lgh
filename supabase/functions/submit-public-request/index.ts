@@ -110,7 +110,27 @@ Deno.serve(async (req) => {
 
     console.log('Request created:', request.request_number);
 
-    // 3. Increment submission count
+    // 3. Insert intermediate stops if provided (for multi-stop trips)
+    if (requestData.stops && requestData.stops.length > 0) {
+      const stopsToInsert = requestData.stops.map((location: string, index: number) => ({
+        request_id: request.id,
+        location,
+        stop_order: index + 1,
+      }));
+
+      const { error: stopsError } = await supabase
+        .from('request_stops')
+        .insert(stopsToInsert);
+
+      if (stopsError) {
+        console.error('Error inserting stops:', stopsError);
+        // Non-critical, continue - the request was created successfully
+      } else {
+        console.log('Inserted', requestData.stops.length, 'intermediate stops');
+      }
+    }
+
+    // 4. Increment submission count
     const { error: updateError } = await supabase.rpc('increment_form_submissions', { 
       link_id: formLink.id 
     });
@@ -120,7 +140,7 @@ Deno.serve(async (req) => {
       // Non-critical, continue
     }
 
-    // 4. Log to request history
+    // 5. Log to request history
     await supabase.from('request_history').insert({
       request_id: request.id,
       action: 'Public request submitted',

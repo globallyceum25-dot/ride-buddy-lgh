@@ -78,6 +78,7 @@ interface RequestDialogProps {
 
 export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
   const [passengers, setPassengers] = useState<Passenger[]>([]);
+  const [stops, setStops] = useState<string[]>([]);
   const createRequest = useCreateRequest();
   const { data: approvers = [], isLoading: loadingApprovers } = useApprovers();
 
@@ -100,6 +101,15 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
   });
 
   const tripType = form.watch('trip_type');
+
+  // Stops management
+  const addStop = () => setStops([...stops, '']);
+  const removeStop = (index: number) => setStops(stops.filter((_, i) => i !== index));
+  const updateStop = (index: number, value: string) => {
+    const updated = [...stops];
+    updated[index] = value;
+    setStops(updated);
+  };
 
   const addPassenger = () => {
     setPassengers([...passengers, { name: '', phone: '', is_primary: passengers.length === 0 }]);
@@ -155,10 +165,12 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
       cost_center: values.cost_center || null,
       notes: values.notes || null,
       passengers: passengers.filter(p => p.name.trim()),
+      stops: values.trip_type === 'multi_stop' ? stops.filter(s => s.trim()) : [],
     });
 
     form.reset();
     setPassengers([]);
+    setStops([]);
     onOpenChange(false);
   };
 
@@ -296,12 +308,52 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
                 />
               </div>
 
+              {/* Intermediate Stops Section - shown only for multi_stop */}
+              {tripType === 'multi_stop' && (
+                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium">Intermediate Stops</h4>
+                    <Button type="button" variant="outline" size="sm" onClick={addStop}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Stop
+                    </Button>
+                  </div>
+                  {stops.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No intermediate stops added. Click "Add Stop" to add locations between pickup and final destination.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {stops.map((stop, index) => (
+                        <div key={index} className="flex gap-2 items-center">
+                          <span className="text-sm text-muted-foreground w-16">Stop {index + 1}</span>
+                          <Input
+                            placeholder={`Enter stop ${index + 1} location`}
+                            value={stop}
+                            onChange={(e) => updateStop(index, e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeStop(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <FormField
                 control={form.control}
                 name="dropoff_location"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Dropoff Location</FormLabel>
+                    <FormLabel>{tripType === 'multi_stop' ? 'Final Destination' : 'Dropoff Location'}</FormLabel>
                     <FormControl>
                       <Input placeholder="Enter destination address" {...field} />
                     </FormControl>
