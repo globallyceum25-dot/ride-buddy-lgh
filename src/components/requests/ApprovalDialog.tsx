@@ -19,7 +19,8 @@ import {
   Users, 
   User, 
   CheckCircle,
-  XCircle
+  XCircle,
+  Circle
 } from 'lucide-react';
 import { RequestStatusBadge } from './RequestStatusBadge';
 import { RequestPriorityBadge } from './RequestPriorityBadge';
@@ -50,6 +51,7 @@ export function ApprovalDialog({
   const rejectRequest = useRejectRequest();
 
   const request = data?.request;
+  const stops = data?.stops || [];
 
   const handleApprove = async () => {
     if (!requestId) return;
@@ -157,6 +159,24 @@ export function ApprovalDialog({
                     </div>
                   </div>
                 </div>
+
+                {/* Intermediate Stops */}
+                {stops.length > 0 && (
+                  <div className="flex items-start gap-3">
+                    <Circle className="h-4 w-4 text-muted-foreground mt-1" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Intermediate Stops ({stops.length})</p>
+                      <div className="mt-1 space-y-1">
+                        {stops.map((stop, index) => (
+                          <div key={stop.id} className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Stop {index + 1}:</span>
+                            <span className="text-sm text-muted-foreground">{stop.location}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-start gap-3">
                   <Calendar className="h-4 w-4 text-muted-foreground mt-1" />
