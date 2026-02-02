@@ -302,6 +302,18 @@ export function useTripStats(date?: string) {
   });
 }
 
+export interface MonthTripPreview {
+  id: string;
+  time: string;
+  pickup: string;
+  dropoff: string;
+  status: AllocationStatus;
+  vehicleReg: string | null;
+  driverName: string | null;
+  passengerCount: number;
+  isPooled: boolean;
+}
+
 export interface MonthTripData {
   [date: string]: {
     total: number;
@@ -309,6 +321,7 @@ export interface MonthTripData {
     dispatched: number;
     inProgress: number;
     completed: number;
+    trips: MonthTripPreview[];
   };
 }
 
@@ -327,14 +340,36 @@ export function useMonthSchedule(monthDate: Date) {
 
       const { data: allocations, error } = await supabase
         .from('allocations')
-        .select('scheduled_pickup, status')
+        .select(`
+          id,
+          scheduled_pickup,
+          status,
+          pool_id,
+          request:travel_requests(
+            pickup_location,
+            dropoff_location,
+            passenger_count
+          ),
+          vehicle:vehicles(registration_number),
+          driver:drivers(user_id)
+        `)
         .gte('scheduled_pickup', format(calendarStart, "yyyy-MM-dd'T'00:00:00"))
         .lte('scheduled_pickup', format(calendarEnd, "yyyy-MM-dd'T'23:59:59"))
-        .neq('status', 'cancelled');
+        .neq('status', 'cancelled')
+        .order('scheduled_pickup', { ascending: true });
 
       if (error) throw error;
 
-      // Group by date with status counts
+      // Fetch driver profiles for names
+      const driverUserIds = [...new Set(allocations?.map(a => a.driver?.user_id).filter(Boolean))] as string[];
+      const { data: driverProfiles } = driverUserIds.length > 0 
+        ? await supabase
+            .from('profiles')
+            .select('user_id, full_name')
+            .in('user_id', driverUserIds)
+        : { data: [] };
+
+      // Group by date with status counts and trip details
       const tripData: MonthTripData = {};
       
       allocations?.forEach(allocation => {
@@ -346,6 +381,7 @@ export function useMonthSchedule(monthDate: Date) {
             dispatched: 0,
             inProgress: 0,
             completed: 0,
+            trips: [],
           };
         }
         
@@ -365,6 +401,20 @@ export function useMonthSchedule(monthDate: Date) {
             tripData[dateStr].completed++;
             break;
         }
+
+        // Add trip preview
+        const driverProfile = driverProfiles?.find(p => p.user_id === allocation.driver?.user_id);
+        tripData[dateStr].trips.push({
+          id: allocation.id,
+          time: format(new Date(allocation.scheduled_pickup), 'HH:mm'),
+          pickup: allocation.request?.pickup_location || 'Unknown',
+          dropoff: allocation.request?.dropoff_location || 'Unknown',
+          status: allocation.status as AllocationStatus,
+          vehicleReg: allocation.vehicle?.registration_number || null,
+          driverName: driverProfile?.full_name || null,
+          passengerCount: allocation.request?.passenger_count || 1,
+          isPooled: !!allocation.pool_id,
+        });
       });
 
       return tripData;

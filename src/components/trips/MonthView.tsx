@@ -12,6 +12,7 @@ import {
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DayTripPopover, type MonthTripPreview } from './DayTripPopover';
 
 interface MonthTripData {
   [date: string]: {
@@ -20,6 +21,7 @@ interface MonthTripData {
     dispatched: number;
     inProgress: number;
     completed: number;
+    trips: MonthTripPreview[];
   };
 }
 
@@ -92,12 +94,11 @@ export function MonthView({
           const isDayToday = isToday(day);
           const hasTrips = dayData && dayData.total > 0;
 
-          return (
+          const dayButton = (
             <button
-              key={dateStr}
               onClick={() => onSelectDate(day)}
               className={cn(
-                'relative min-h-[80px] p-2 border-r border-b transition-all duration-150',
+                'relative min-h-[80px] w-full p-2 border-r border-b transition-all duration-150',
                 'hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset',
                 // Row borders
                 index % 7 === 6 && 'border-r-0',
@@ -173,6 +174,19 @@ export function MonthView({
                 </div>
               )}
             </button>
+          );
+
+          return hasTrips ? (
+            <DayTripPopover
+              key={dateStr}
+              date={day}
+              trips={dayData.trips}
+              onSelectDate={onSelectDate}
+            >
+              {dayButton}
+            </DayTripPopover>
+          ) : (
+            <div key={dateStr}>{dayButton}</div>
           );
         })}
       </div>
