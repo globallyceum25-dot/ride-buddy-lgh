@@ -19,7 +19,8 @@ import {
   AlertCircle,
   Mail,
   Phone,
-  BadgeCheck
+  BadgeCheck,
+  Circle
 } from 'lucide-react';
 import { RequestStatusBadge } from './RequestStatusBadge';
 import { RequestPriorityBadge } from './RequestPriorityBadge';
@@ -70,6 +71,7 @@ export function RequestDetailDialog({
   const request = data?.request;
   const passengers = data?.passengers || [];
   const history = data?.history || [];
+  const stops = data?.stops || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,10 +124,30 @@ export function RequestDetailDialog({
                     </div>
                   </div>
 
+                  {/* Intermediate Stops */}
+                  {stops.length > 0 && (
+                    <div className="flex items-start gap-3">
+                      <div className="flex flex-col items-center">
+                        <Circle className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Intermediate Stops</p>
+                        <div className="mt-1 space-y-1">
+                          {stops.map((stop, index) => (
+                            <div key={stop.id} className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground w-12">Stop {index + 1}</span>
+                              <span className="text-sm text-muted-foreground">{stop.location}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-start gap-3">
                     <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium">Destination</p>
+                      <p className="text-sm font-medium">{stops.length > 0 ? 'Final Destination' : 'Destination'}</p>
                       <p className="text-sm text-muted-foreground">{request.dropoff_location}</p>
                     </div>
                   </div>

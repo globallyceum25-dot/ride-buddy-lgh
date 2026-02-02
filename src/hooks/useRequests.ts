@@ -70,6 +70,14 @@ export interface RequestHistory {
   } | null;
 }
 
+export interface RequestStop {
+  id: string;
+  request_id: string;
+  location: string;
+  stop_order: number;
+  created_at: string;
+}
+
 export interface CreateRequestInput {
   trip_type: TripType;
   purpose: string;
@@ -228,15 +236,15 @@ export function useApprovalRequests(statusFilter?: RequestStatus) {
   });
 }
 
-// Fetch single request with passengers and history
+// Fetch single request with passengers, history, and stops
 export function useRequest(id: string | undefined) {
   return useQuery({
     queryKey: ['request', id],
     queryFn: async () => {
       if (!id) return null;
 
-      // Step 1: Fetch request, passengers, and history in parallel
-      const [requestResult, passengersResult, historyResult] = await Promise.all([
+      // Step 1: Fetch request, passengers, history, and stops in parallel
+      const [requestResult, passengersResult, historyResult, stopsResult] = await Promise.all([
         supabase
           .from('travel_requests')
           .select('*')
@@ -252,17 +260,24 @@ export function useRequest(id: string | undefined) {
           .select('*')
           .eq('request_id', id)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('request_stops')
+          .select('*')
+          .eq('request_id', id)
+          .order('stop_order', { ascending: true }),
       ]);
 
       if (requestResult.error) throw requestResult.error;
       if (passengersResult.error) throw passengersResult.error;
       if (historyResult.error) throw historyResult.error;
+      if (stopsResult.error) throw stopsResult.error;
 
       if (!requestResult.data) {
         return {
           request: null,
           passengers: passengersResult.data as RequestPassenger[],
           history: [],
+          stops: [],
         };
       }
 
@@ -295,6 +310,7 @@ export function useRequest(id: string | undefined) {
         request: enrichedRequest,
         passengers: passengersResult.data as RequestPassenger[],
         history: enrichedHistory,
+        stops: stopsResult.data as RequestStop[],
       };
     },
     enabled: !!id,
