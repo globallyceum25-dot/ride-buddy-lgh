@@ -132,12 +132,12 @@ export function AuditLogs() {
             </SelectContent>
           </Select>
 
-          <Select value={action} onValueChange={setAction}>
+          <Select value={action || "all"} onValueChange={(val) => setAction(val === "all" ? "" : val)}>
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="All actions" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All actions</SelectItem>
+              <SelectItem value="all">All actions</SelectItem>
               {ACTION_TYPES.map((type) => (
                 <SelectItem key={type} value={type}>
                   {type}
@@ -146,12 +146,12 @@ export function AuditLogs() {
             </SelectContent>
           </Select>
 
-          <Select value={tableName} onValueChange={setTableName}>
+          <Select value={tableName || "all"} onValueChange={(val) => setTableName(val === "all" ? "" : val)}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="All tables" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All tables</SelectItem>
+              <SelectItem value="all">All tables</SelectItem>
               {TABLE_NAMES.map((table) => (
                 <SelectItem key={table} value={table}>
                   {table.replace(/_/g, ' ')}
