@@ -25,6 +25,8 @@ interface KanbanColumnProps {
   onCancel: (allocation: Allocation) => void;
   onDispatch: (allocation: Allocation) => void;
   isOver?: boolean;
+  hoveredPoolId?: string | null;
+  onPoolHover?: (poolId: string | null) => void;
 }
 
 interface KanbanColumnContentProps {
@@ -33,6 +35,8 @@ interface KanbanColumnContentProps {
   onCompleteTrip: (allocation: Allocation) => void;
   onCancel: (allocation: Allocation) => void;
   onDispatch: (allocation: Allocation) => void;
+  hoveredPoolId?: string | null;
+  onPoolHover?: (poolId: string | null) => void;
 }
 
 function KanbanColumnContent({
@@ -41,6 +45,8 @@ function KanbanColumnContent({
   onCompleteTrip,
   onCancel,
   onDispatch,
+  hoveredPoolId,
+  onPoolHover,
 }: KanbanColumnContentProps) {
   // Separate pooled and non-pooled allocations
   const { pooledGroups, standaloneAllocations } = useMemo(() => {
@@ -90,6 +96,8 @@ function KanbanColumnContent({
           onCompleteTrip={onCompleteTrip}
           onCancel={onCancel}
           onDispatch={onDispatch}
+          isHighlighted={hoveredPoolId === poolId}
+          onHover={onPoolHover}
         />
       ))}
 
@@ -102,6 +110,8 @@ function KanbanColumnContent({
           onCompleteTrip={() => onCompleteTrip(allocation)}
           onCancel={() => onCancel(allocation)}
           onDispatch={() => onDispatch(allocation)}
+          isPoolHighlighted={hoveredPoolId === allocation.pool_id}
+          onPoolHover={onPoolHover}
         />
       ))}
     </div>
@@ -119,6 +129,8 @@ export function KanbanColumn({
   onCancel,
   onDispatch,
   isOver = false,
+  hoveredPoolId,
+  onPoolHover,
 }: KanbanColumnProps) {
   const { setNodeRef } = useDroppable({
     id,
@@ -167,6 +179,8 @@ export function KanbanColumn({
             onCompleteTrip={onCompleteTrip}
             onCancel={onCancel}
             onDispatch={onDispatch}
+            hoveredPoolId={hoveredPoolId}
+            onPoolHover={onPoolHover}
           />
         </SortableContext>
       </ScrollArea>

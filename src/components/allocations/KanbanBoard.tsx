@@ -83,6 +83,9 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
     targetStatus: AllocationStatus;
   } | null>(null);
 
+  // State for highlighting pooled cards on hover
+  const [hoveredPoolId, setHoveredPoolId] = useState<string | null>(null);
+
   const { data: allocations = [], isLoading } = useAllocations();
   const updateStatus = useUpdateAllocationStatus();
   const bulkUpdateStatus = useBulkUpdateAllocationStatus();
@@ -419,6 +422,8 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
                 onCancel={handleCancel}
                 onDispatch={handleDispatch}
                 isOver={overId === column.id}
+                hoveredPoolId={hoveredPoolId}
+                onPoolHover={setHoveredPoolId}
               />
             ))}
         </div>

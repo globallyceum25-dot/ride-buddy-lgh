@@ -20,15 +20,20 @@ interface PoolGroupProps {
   onCompleteTrip: (allocation: Allocation) => void;
   onCancel: (allocation: Allocation) => void;
   onDispatch: (allocation: Allocation) => void;
+  isHighlighted?: boolean;
+  onHover?: (poolId: string | null) => void;
 }
 
 export function PoolGroup({
+  poolId,
   poolNumber,
   allocations,
   onStartTrip,
   onCompleteTrip,
   onCancel,
   onDispatch,
+  isHighlighted = false,
+  onHover,
 }: PoolGroupProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -41,20 +46,34 @@ export function PoolGroup({
   const sharedVehicle = allocations[0]?.vehicle?.registration_number;
   const sharedDriver = allocations[0]?.driverProfile?.full_name;
 
+  const handleMouseEnter = () => {
+    onHover?.(poolId);
+  };
+
+  const handleMouseLeave = () => {
+    onHover?.(null);
+  };
+
   return (
     <div
       className={cn(
-        'rounded-lg border-2 border-dashed border-accent/50',
+        'rounded-lg border-2 border-dashed',
         'bg-gradient-to-br from-accent/10 to-accent/5',
-        'p-2'
+        'p-2 transition-all duration-200',
+        isHighlighted
+          ? 'border-primary ring-2 ring-primary/30 shadow-lg scale-[1.02]'
+          : 'border-accent/50'
       )}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* Pool Header - Clickable to toggle */}
       <div
         className={cn(
           'flex items-center justify-between',
-          'px-2 py-1.5 rounded-md bg-accent/20',
-          'cursor-pointer select-none hover:bg-accent/30 transition-colors',
+          'px-2 py-1.5 rounded-md',
+          'cursor-pointer select-none transition-colors',
+          isHighlighted ? 'bg-primary/20' : 'bg-accent/20 hover:bg-accent/30',
           !isCollapsed && 'mb-2'
         )}
         onClick={() => setIsCollapsed(!isCollapsed)}
@@ -85,9 +104,16 @@ export function PoolGroup({
             </span>
           )}
         </div>
-        <Badge variant="secondary" className="text-xs">
-          {totalPassengers} passengers
-        </Badge>
+        <div className="flex items-center gap-2">
+          {isHighlighted && (
+            <Badge variant="default" className="text-xs animate-pulse">
+              Move together
+            </Badge>
+          )}
+          <Badge variant="secondary" className="text-xs">
+            {totalPassengers} passengers
+          </Badge>
+        </div>
       </div>
 
       {/* Collapsed Summary */}
@@ -116,10 +142,12 @@ export function PoolGroup({
                 key={allocation.id}
                 allocation={allocation}
                 isGrouped
+                isPoolHighlighted={isHighlighted}
                 onStartTrip={() => onStartTrip(allocation)}
                 onCompleteTrip={() => onCompleteTrip(allocation)}
                 onCancel={() => onCancel(allocation)}
                 onDispatch={() => onDispatch(allocation)}
+                onPoolHover={onHover}
               />
             ))}
           </div>
