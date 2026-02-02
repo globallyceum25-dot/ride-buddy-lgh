@@ -25,138 +25,159 @@ import PublicRequestForm from "./pages/PublicRequestForm";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <HashRouter>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
-            <Route path="/request/:token" element={<PublicRequestForm />} />
+const App = () => {
+  // Check if this is a public form link - render without AuthProvider
+  const hash = window.location.hash;
+  if (hash.startsWith('#/request/')) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <HashRouter>
+            <Routes>
+              <Route path="/request/:token" element={<PublicRequestForm />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </HashRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
 
-            {/* Redirect root to dashboard */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+  // Regular app with authentication
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <HashRouter>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/unauthorized" element={<Unauthorized />} />
 
-            {/* Protected routes */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
+              {/* Redirect root to dashboard */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-            {/* Travel Requests - All authenticated users */}
-            <Route
-              path="/requests"
-              element={
-                <ProtectedRoute>
-                  <Requests />
-                </ProtectedRoute>
-              }
-            />
+              {/* Protected routes */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Approvals - Approvers only */}
-            <Route
-              path="/approvals"
-              element={
-                <ProtectedRoute allowedRoles={['approver', 'group_admin']}>
-                  <Approvals />
-                </ProtectedRoute>
-              }
-            />
+              {/* Travel Requests - All authenticated users */}
+              <Route
+                path="/requests"
+                element={
+                  <ProtectedRoute>
+                    <Requests />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Master Data Management - Admin only */}
-            <Route
-              path="/locations"
-              element={
-                <ProtectedRoute allowedRoles={['group_admin']}>
-                  <Locations />
-                </ProtectedRoute>
-              }
-            />
+              {/* Approvals - Approvers only */}
+              <Route
+                path="/approvals"
+                element={
+                  <ProtectedRoute allowedRoles={['approver', 'group_admin']}>
+                    <Approvals />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Vehicles & Drivers - Admins and Coordinators */}
-            <Route
-              path="/vehicles"
-              element={
-                <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
-                  <Vehicles />
-                </ProtectedRoute>
-              }
-            />
-            
-            <Route
-              path="/drivers"
-              element={
-                <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
-                  <Drivers />
-                </ProtectedRoute>
-              }
-            />
+              {/* Master Data Management - Admin only */}
+              <Route
+                path="/locations"
+                element={
+                  <ProtectedRoute allowedRoles={['group_admin']}>
+                    <Locations />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Allocations - Admins and Coordinators */}
-            <Route
-              path="/allocations"
-              element={
-                <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
-                  <Allocations />
-                </ProtectedRoute>
-              }
-            />
+              {/* Vehicles & Drivers - Admins and Coordinators */}
+              <Route
+                path="/vehicles"
+                element={
+                  <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
+                    <Vehicles />
+                  </ProtectedRoute>
+                }
+              />
+              
+              <Route
+                path="/drivers"
+                element={
+                  <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
+                    <Drivers />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Trip Schedule - Drivers, Coordinators, and Admins */}
-            <Route
-              path="/trips"
-              element={
-                <ProtectedRoute allowedRoles={['driver', 'group_admin', 'location_coordinator']}>
-                  <TripSchedule />
-                </ProtectedRoute>
-              }
-            />
+              {/* Allocations - Admins and Coordinators */}
+              <Route
+                path="/allocations"
+                element={
+                  <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
+                    <Allocations />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Reports - Coordinators and Admins */}
-            <Route
-              path="/reports"
-              element={
-                <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
-                  <Reports />
-                </ProtectedRoute>
-              }
-            />
+              {/* Trip Schedule - Drivers, Coordinators, and Admins */}
+              <Route
+                path="/trips"
+                element={
+                  <ProtectedRoute allowedRoles={['driver', 'group_admin', 'location_coordinator']}>
+                    <TripSchedule />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* User Management - Group Admin only */}
-            <Route
-              path="/users"
-              element={
-                <ProtectedRoute allowedRoles={['group_admin']}>
-                  <Users />
-                </ProtectedRoute>
-              }
-            />
+              {/* Reports - Coordinators and Admins */}
+              <Route
+                path="/reports"
+                element={
+                  <ProtectedRoute allowedRoles={['group_admin', 'location_coordinator']}>
+                    <Reports />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Settings - Group Admin only */}
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute allowedRoles={['group_admin']}>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
+              {/* User Management - Group Admin only */}
+              <Route
+                path="/users"
+                element={
+                  <ProtectedRoute allowedRoles={['group_admin']}>
+                    <Users />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Catch-all */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </HashRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+              {/* Settings - Group Admin only */}
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute allowedRoles={['group_admin']}>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Catch-all */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </HashRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
