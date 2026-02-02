@@ -4,7 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, Car, CheckCircle, AlertCircle, Loader2, Plus, Trash2 } from 'lucide-react';
+import { CalendarIcon, Car, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { SortableStops } from '@/components/requests/SortableStops';
 import { usePublicFormLink, useSubmitPublicRequest } from '@/hooks/usePublicRequest';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,14 +68,7 @@ export default function PublicRequestForm() {
 
   const tripType = form.watch('trip_type');
 
-  // Stops management
-  const addStop = () => setStops([...stops, '']);
-  const removeStop = (index: number) => setStops(stops.filter((_, i) => i !== index));
-  const updateStop = (index: number, value: string) => {
-    const updated = [...stops];
-    updated[index] = value;
-    setStops(updated);
-  };
+  // Stops management handled by SortableStops component
 
   const onSubmit = async (values: FormValues) => {
     if (!token) return;
@@ -306,42 +300,7 @@ export default function PublicRequestForm() {
 
                 {/* Intermediate Stops Section - shown only for multi_stop */}
                 {tripType === 'multi_stop' && (
-                  <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-medium">Intermediate Stops</h4>
-                      <Button type="button" variant="outline" size="sm" onClick={addStop}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Stop
-                      </Button>
-                    </div>
-                    {stops.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">
-                        No intermediate stops added. Click "Add Stop" to add locations between pickup and final destination.
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {stops.map((stop, index) => (
-                          <div key={index} className="flex gap-2 items-center">
-                            <span className="text-sm text-muted-foreground w-16">Stop {index + 1}</span>
-                            <Input
-                              placeholder={`Enter stop ${index + 1} location`}
-                              value={stop}
-                              onChange={(e) => updateStop(index, e.target.value)}
-                              className="flex-1"
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeStop(index)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <SortableStops stops={stops} onStopsChange={setStops} />
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
