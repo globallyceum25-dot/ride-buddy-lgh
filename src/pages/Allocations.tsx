@@ -198,16 +198,25 @@ export default function Allocations() {
                   </TabsTrigger>
                 </TabsList>
 
-                {activeTab === 'pending' && selectedRequests.length >= 2 && (
-                  <Button 
-                    onClick={() => setShowMergeDialog(true)}
-                    disabled={!canMerge}
-                    variant="outline"
-                    className="gap-2"
-                  >
-                    <Merge className="h-4 w-4" />
-                    Merge Selected ({selectedRequests.length})
-                  </Button>
+                {activeTab === 'pending' && (
+                  <div className="flex items-center gap-2">
+                    {pendingRequests.length === 1 && (
+                      <p className="text-sm text-muted-foreground">
+                        Need 2+ requests to merge
+                      </p>
+                    )}
+                    {selectedRequests.length >= 2 && (
+                      <Button 
+                        onClick={() => setShowMergeDialog(true)}
+                        disabled={!canMerge}
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        <Merge className="h-4 w-4" />
+                        Merge Selected ({selectedRequests.length})
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
 
