@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Plus, Copy, Trash2, ToggleLeft, ToggleRight, ExternalLink } from 'lucide-react';
 import { useFormLinks, useUpdateFormLink, useDeleteFormLink } from '@/hooks/usePublicRequest';
+import { useSystemSettings } from '@/hooks/useSettings';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,8 +22,11 @@ import {
 import { toast } from 'sonner';
 import { CreateFormLinkDialog } from './CreateFormLinkDialog';
 
+const DEFAULT_DOMAIN = 'https://ride-buddy-lgh.lovable.app';
+
 export function PublicFormLinks() {
   const { data: links, isLoading } = useFormLinks();
+  const { data: settings } = useSystemSettings();
   const updateMutation = useUpdateFormLink();
   const deleteMutation = useDeleteFormLink();
   const queryClient = useQueryClient();
@@ -30,9 +34,13 @@ export function PublicFormLinks() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [linkToDelete, setLinkToDelete] = useState<string | null>(null);
 
+  const publishedDomain = useMemo(() => {
+    const generalSettings = settings?.find(s => s.key === 'general');
+    const domain = (generalSettings?.value as Record<string, string>)?.published_domain;
+    return domain || DEFAULT_DOMAIN;
+  }, [settings]);
+
   const getPublicUrl = (token: string) => {
-    // Use published domain for shareable links
-    const publishedDomain = 'https://ride-buddy-lgh.lovable.app';
     return `${publishedDomain}/request/${token}`;
   };
 
