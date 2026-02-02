@@ -31,7 +31,9 @@ export function PublicFormLinks() {
   const [linkToDelete, setLinkToDelete] = useState<string | null>(null);
 
   const getPublicUrl = (token: string) => {
-    return `${window.location.origin}/request/${token}`;
+    // Use published domain for shareable links
+    const publishedDomain = 'https://ride-buddy-lgh.lovable.app';
+    return `${publishedDomain}/request/${token}`;
   };
 
   const copyToClipboard = (token: string) => {
