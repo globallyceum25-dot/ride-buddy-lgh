@@ -123,10 +123,14 @@ export function useCreateUser() {
         body: data,
       });
 
+      // Handle function invocation error
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to create user');
+        // Try to get more specific error message from the response
+        const errorMessage = response.error.message || 'Failed to create user';
+        throw new Error(errorMessage);
       }
 
+      // Handle application-level errors returned in the data
       if (response.data?.error) {
         throw new Error(response.data.error);
       }
@@ -141,6 +145,7 @@ export function useCreateUser() {
       });
     },
     onError: (error: Error) => {
+      console.error('Create user error:', error);
       toast({
         title: 'Error creating user',
         description: error.message,
