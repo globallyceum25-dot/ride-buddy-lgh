@@ -10,7 +10,8 @@ import {
   MoreHorizontal,
   Merge,
   Play,
-  X
+  X,
+  Gauge
 } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -41,13 +42,15 @@ import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge
 import { AllocationStatusBadge } from '@/components/allocations/AllocationStatusBadge';
 import { AllocationDialog } from '@/components/allocations/AllocationDialog';
 import { MergeRequestsDialog } from '@/components/allocations/MergeRequestsDialog';
+import { TripTrackingDialog } from '@/components/allocations/TripTrackingDialog';
 import { 
   usePendingAllocation, 
   useAllocations, 
   useTripPools,
   useUpdateAllocationStatus,
   useCancelAllocation,
-  checkPoolCompatibility
+  checkPoolCompatibility,
+  Allocation
 } from '@/hooks/useAllocations';
 
 export default function Allocations() {
@@ -55,6 +58,8 @@ export default function Allocations() {
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const [assignDialogRequest, setAssignDialogRequest] = useState<any>(null);
   const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [trackingAllocation, setTrackingAllocation] = useState<Allocation | null>(null);
+  const [trackingMode, setTrackingMode] = useState<'start' | 'complete'>('start');
 
   const { data: pendingRequests = [], isLoading: loadingPending } = usePendingAllocation();
   const { data: allocations = [], isLoading: loadingAllocations } = useAllocations();
@@ -315,6 +320,8 @@ export default function Allocations() {
                           <TableHead>Driver</TableHead>
                           <TableHead>Route</TableHead>
                           <TableHead>Scheduled</TableHead>
+                          <TableHead>Odometer</TableHead>
+                          <TableHead>Distance</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -347,6 +354,24 @@ export default function Allocations() {
                               {format(new Date(allocation.scheduled_pickup), 'MMM d, h:mm a')}
                             </TableCell>
                             <TableCell>
+                              {allocation.odometer_start ? (
+                                <span className="text-sm">{allocation.odometer_start.toLocaleString()} km</span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {allocation.odometer_start && allocation.odometer_end ? (
+                                <span className="text-sm font-medium">
+                                  {(allocation.odometer_end - allocation.odometer_start).toLocaleString()} km
+                                </span>
+                              ) : allocation.status === 'in_progress' ? (
+                                <span className="text-muted-foreground text-xs">In progress</span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
                               <AllocationStatusBadge status={allocation.status} />
                             </TableCell>
                             <TableCell className="text-right">
@@ -370,10 +395,10 @@ export default function Allocations() {
                                   )}
                                   {allocation.status === 'dispatched' && (
                                     <DropdownMenuItem
-                                      onClick={() => updateStatus.mutate({ 
-                                        id: allocation.id, 
-                                        status: 'in_progress' 
-                                      })}
+                                      onClick={() => {
+                                        setTrackingAllocation(allocation);
+                                        setTrackingMode('start');
+                                      }}
                                     >
                                       <Car className="h-4 w-4 mr-2" />
                                       Start Trip
@@ -381,13 +406,13 @@ export default function Allocations() {
                                   )}
                                   {allocation.status === 'in_progress' && (
                                     <DropdownMenuItem
-                                      onClick={() => updateStatus.mutate({ 
-                                        id: allocation.id, 
-                                        status: 'completed' 
-                                      })}
+                                      onClick={() => {
+                                        setTrackingAllocation(allocation);
+                                        setTrackingMode('complete');
+                                      }}
                                     >
-                                      <CheckCircle className="h-4 w-4 mr-2" />
-                                      Complete
+                                      <Gauge className="h-4 w-4 mr-2" />
+                                      Complete Trip
                                     </DropdownMenuItem>
                                   )}
                                   {['scheduled', 'dispatched'].includes(allocation.status) && (
@@ -497,6 +522,26 @@ export default function Allocations() {
           if (!open) setSelectedRequests([]);
         }}
         requests={selectedRequestObjects}
+      />
+
+      {/* Trip Tracking Dialog */}
+      <TripTrackingDialog
+        open={!!trackingAllocation}
+        onOpenChange={(open) => !open && setTrackingAllocation(null)}
+        allocation={trackingAllocation}
+        mode={trackingMode}
+        isLoading={updateStatus.isPending}
+        onSubmit={(data) => {
+          if (!trackingAllocation) return;
+          updateStatus.mutate({
+            id: trackingAllocation.id,
+            status: trackingMode === 'start' ? 'in_progress' : 'completed',
+            vehicle_id: trackingAllocation.vehicle_id,
+            ...data,
+          }, {
+            onSuccess: () => setTrackingAllocation(null),
+          });
+        }}
       />
     </DashboardLayout>
   );
