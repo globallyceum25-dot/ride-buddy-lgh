@@ -21,12 +21,6 @@ import {
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/components/ui/tabs';
-import {
   Table,
   TableBody,
   TableCell,
@@ -49,6 +43,8 @@ import { AllocationDialog } from '@/components/allocations/AllocationDialog';
 import { MergeRequestsDialog } from '@/components/allocations/MergeRequestsDialog';
 import { TripTrackingDialog } from '@/components/allocations/TripTrackingDialog';
 import { RouteDisplay } from '@/components/allocations/RouteDisplay';
+import { KanbanBoard } from '@/components/allocations/KanbanBoard';
+import { KanbanFilters, ViewMode } from '@/components/allocations/KanbanFilters';
 import { 
   usePendingAllocation, 
   useAllocations, 
@@ -60,7 +56,9 @@ import {
 } from '@/hooks/useAllocations';
 
 export default function Allocations() {
-  const [activeTab, setActiveTab] = useState<'pending' | 'active' | 'pools'>('pending');
+  const [viewMode, setViewMode] = useState<ViewMode>('board');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const [assignDialogRequest, setAssignDialogRequest] = useState<any>(null);
   const [showMergeDialog, setShowMergeDialog] = useState(false);
@@ -109,6 +107,16 @@ export default function Allocations() {
     ['pending', 'confirmed', 'dispatched'].includes(p.status)
   );
 
+  // Stats
+  const stats = {
+    pending: pendingRequests.length,
+    active: activeAllocations.length,
+    pooled: activePools.length,
+    today: activeAllocations.filter(a => 
+      format(new Date(a.scheduled_pickup), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+    ).length,
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -120,7 +128,7 @@ export default function Allocations() {
           </p>
         </div>
 
-        {/* Stats */}
+        {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -128,7 +136,7 @@ export default function Allocations() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{pendingRequests.length}</div>
+              <div className="text-2xl font-bold">{stats.pending}</div>
               <p className="text-xs text-muted-foreground">
                 Awaiting allocation
               </p>
@@ -140,7 +148,7 @@ export default function Allocations() {
               <Car className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{activeAllocations.length}</div>
+              <div className="text-2xl font-bold">{stats.active}</div>
               <p className="text-xs text-muted-foreground">
                 Trips in progress
               </p>
@@ -152,7 +160,7 @@ export default function Allocations() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{activePools.length}</div>
+              <div className="text-2xl font-bold">{stats.pooled}</div>
               <p className="text-xs text-muted-foreground">
                 Active trip pools
               </p>
@@ -164,11 +172,7 @@ export default function Allocations() {
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {activeAllocations.filter(a => 
-                  format(new Date(a.scheduled_pickup), 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
-                ).length}
-              </div>
+              <div className="text-2xl font-bold">{stats.today}</div>
               <p className="text-xs text-muted-foreground">
                 Trips scheduled today
               </p>
@@ -176,169 +180,167 @@ export default function Allocations() {
           </Card>
         </div>
 
-        {/* Main Content */}
+        {/* Pending Requests Section (Always visible when there are pending requests) */}
+        {pendingRequests.length > 0 && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Pending Allocation
+                    <Badge variant="secondary">{pendingRequests.length}</Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Approved requests awaiting vehicle and driver assignment
+                  </CardDescription>
+                </div>
+                {selectedRequests.length >= 2 && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button 
+                          onClick={() => setShowMergeDialog(true)}
+                          disabled={!canMerge}
+                          variant="outline"
+                          className="gap-2"
+                        >
+                          <Merge className="h-4 w-4" />
+                          Merge Selected ({selectedRequests.length})
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!canMerge && mergeCompatibility.reason && (
+                      <TooltipContent>
+                        <p>{mergeCompatibility.reason}</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingPending ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-muted-foreground">Loading...</p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox 
+                            checked={selectedRequests.length === pendingRequests.length}
+                            onCheckedChange={selectAll}
+                          />
+                        </TableHead>
+                        <TableHead>Request #</TableHead>
+                        <TableHead>Requester</TableHead>
+                        <TableHead>Route</TableHead>
+                        <TableHead>Date/Time</TableHead>
+                        <TableHead>Passengers</TableHead>
+                        <TableHead>Priority</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {pendingRequests.map((request) => (
+                        <TableRow key={request.id}>
+                          <TableCell>
+                            <Checkbox
+                              checked={selectedRequests.includes(request.id)}
+                              onCheckedChange={() => toggleRequestSelection(request.id)}
+                            />
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {request.request_number}
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              {request.is_guest_request ? (
+                                <>
+                                  <p className="font-medium">{request.guest_name || 'Guest'}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {request.guest_employee_id || request.guest_email || 'No details'}
+                                  </p>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="font-medium">{request.requester?.full_name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {request.requester?.department}
+                                  </p>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <RouteDisplay 
+                              pickup={request.pickup_location} 
+                              destination={request.dropoff_location}
+                              stops={(request as any).stops}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {format(new Date(request.pickup_datetime), 'MMM d, yyyy')}
+                            <br />
+                            <span className="text-muted-foreground text-xs">
+                              {format(new Date(request.pickup_datetime), 'h:mm a')}
+                            </span>
+                          </TableCell>
+                          <TableCell>{request.passenger_count}</TableCell>
+                          <TableCell>
+                            <RequestPriorityBadge priority={request.priority} />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => setAssignDialogRequest(request)}
+                            >
+                              Assign
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Main Board Section */}
         <Card>
-          <CardHeader>
-            <CardTitle>Manage Allocations</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle>Allocations Board</CardTitle>
             <CardDescription>
-              Assign vehicles and drivers, or merge compatible requests
+              Drag and drop trips between stages to update their status
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-              <div className="flex items-center justify-between mb-4">
-                <TabsList>
-                  <TabsTrigger value="pending" className="gap-2">
-                    <Clock className="h-4 w-4" />
-                    Pending
-                    {pendingRequests.length > 0 && (
-                      <Badge variant="secondary" className="ml-1">
-                        {pendingRequests.length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger value="active">
-                    <Car className="h-4 w-4 mr-2" />
-                    Active
-                  </TabsTrigger>
-                  <TabsTrigger value="pools">
-                    <Users className="h-4 w-4 mr-2" />
-                    Pooled Trips
-                  </TabsTrigger>
-                </TabsList>
+            {/* Filters and View Toggle */}
+            <KanbanFilters
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              selectedDate={dateFilter}
+              onDateChange={setDateFilter}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+            />
 
-                {activeTab === 'pending' && (
-                  <div className="flex items-center gap-2">
-                    {pendingRequests.length === 1 && (
-                      <p className="text-sm text-muted-foreground">
-                        Need 2+ requests to merge
-                      </p>
-                    )}
-                    {selectedRequests.length >= 2 && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span>
-                            <Button 
-                              onClick={() => setShowMergeDialog(true)}
-                              disabled={!canMerge}
-                              variant="outline"
-                              className="gap-2"
-                            >
-                              <Merge className="h-4 w-4" />
-                              Merge Selected ({selectedRequests.length})
-                            </Button>
-                          </span>
-                        </TooltipTrigger>
-                        {!canMerge && mergeCompatibility.reason && (
-                          <TooltipContent>
-                            <p>{mergeCompatibility.reason}</p>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    )}
-                  </div>
-                )}
-              </div>
+            {/* Kanban Board View */}
+            {viewMode === 'board' && (
+              <KanbanBoard
+                searchQuery={searchQuery}
+                dateFilter={dateFilter}
+              />
+            )}
 
-              {/* Pending Tab */}
-              <TabsContent value="pending">
-                {loadingPending ? (
-                  <div className="flex items-center justify-center py-8">
-                    <p className="text-muted-foreground">Loading...</p>
-                  </div>
-                ) : pendingRequests.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center">
-                    <CheckCircle className="h-12 w-12 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium">All caught up!</h3>
-                    <p className="text-muted-foreground">No approved requests pending allocation</p>
-                  </div>
-                ) : (
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12">
-                            <Checkbox 
-                              checked={selectedRequests.length === pendingRequests.length}
-                              onCheckedChange={selectAll}
-                            />
-                          </TableHead>
-                          <TableHead>Request #</TableHead>
-                          <TableHead>Requester</TableHead>
-                          <TableHead>Route</TableHead>
-                          <TableHead>Date/Time</TableHead>
-                          <TableHead>Passengers</TableHead>
-                          <TableHead>Priority</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {pendingRequests.map((request) => (
-                          <TableRow key={request.id}>
-                            <TableCell>
-                              <Checkbox
-                                checked={selectedRequests.includes(request.id)}
-                                onCheckedChange={() => toggleRequestSelection(request.id)}
-                              />
-                            </TableCell>
-                            <TableCell className="font-medium">
-                              {request.request_number}
-                            </TableCell>
-                            <TableCell>
-                              <div>
-                                {request.is_guest_request ? (
-                                  <>
-                                    <p className="font-medium">{request.guest_name || 'Guest'}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {request.guest_employee_id || request.guest_email || 'No details'}
-                                    </p>
-                                  </>
-                                ) : (
-                                  <>
-                                    <p className="font-medium">{request.requester?.full_name}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {request.requester?.department}
-                                    </p>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <RouteDisplay 
-                                pickup={request.pickup_location} 
-                                destination={request.dropoff_location}
-                                stops={(request as any).stops}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(request.pickup_datetime), 'MMM d, yyyy')}
-                              <br />
-                              <span className="text-muted-foreground text-xs">
-                                {format(new Date(request.pickup_datetime), 'h:mm a')}
-                              </span>
-                            </TableCell>
-                            <TableCell>{request.passenger_count}</TableCell>
-                            <TableCell>
-                              <RequestPriorityBadge priority={request.priority} />
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button
-                                size="sm"
-                                onClick={() => setAssignDialogRequest(request)}
-                              >
-                                Assign
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Active Tab */}
-              <TabsContent value="active">
+            {/* Table View */}
+            {viewMode === 'table' && (
+              <>
                 {loadingAllocations ? (
                   <div className="flex items-center justify-center py-8">
                     <p className="text-muted-foreground">Loading...</p>
@@ -471,10 +473,12 @@ export default function Allocations() {
                     </Table>
                   </div>
                 )}
-              </TabsContent>
+              </>
+            )}
 
-              {/* Pools Tab */}
-              <TabsContent value="pools">
+            {/* Pools View */}
+            {viewMode === 'pools' && (
+              <>
                 {loadingPools ? (
                   <div className="flex items-center justify-center py-8">
                     <p className="text-muted-foreground">Loading...</p>
@@ -539,8 +543,8 @@ export default function Allocations() {
                     </Table>
                   </div>
                 )}
-              </TabsContent>
-            </Tabs>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
