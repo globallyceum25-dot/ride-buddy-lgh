@@ -79,28 +79,71 @@ export interface CreateRequestInput {
   passengers?: { name: string; phone?: string; is_primary?: boolean }[];
 }
 
+// Helper function to fetch profiles for a list of user IDs
+async function fetchProfilesForUsers(userIds: string[]) {
+  if (userIds.length === 0) return new Map<string, { full_name: string; email: string; department: string | null }>();
+  
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('user_id, full_name, email, department')
+    .in('user_id', userIds);
+  
+  if (error) throw error;
+  
+  const profileMap = new Map<string, { full_name: string; email: string; department: string | null }>();
+  profiles?.forEach(p => {
+    profileMap.set(p.user_id, {
+      full_name: p.full_name,
+      email: p.email,
+      department: p.department,
+    });
+  });
+  
+  return profileMap;
+}
+
+// Helper function to enrich requests with profile data
+function enrichRequestsWithProfiles(
+  requests: any[],
+  profileMap: Map<string, { full_name: string; email: string; department: string | null }>
+): TravelRequest[] {
+  return requests.map(r => ({
+    ...r,
+    requester: profileMap.get(r.requester_id) || undefined,
+    approver: r.approver_id ? profileMap.get(r.approver_id) || null : null,
+  }));
+}
+
 // Fetch current user's requests
 export function useMyRequests(statusFilter?: RequestStatus) {
   return useQuery({
     queryKey: ['my-requests', statusFilter],
     queryFn: async () => {
+      // Step 1: Fetch travel requests (no profile joins)
       let query = supabase
         .from('travel_requests')
-        .select(`
-          *,
-          requester:profiles!travel_requests_requester_id_fkey(full_name, email, department),
-          approver:profiles!travel_requests_approver_id_fkey(full_name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (statusFilter) {
         query = query.eq('status', statusFilter);
       }
 
-      const { data, error } = await query;
-
+      const { data: requests, error } = await query;
       if (error) throw error;
-      return data as unknown as TravelRequest[];
+      if (!requests || requests.length === 0) return [];
+
+      // Step 2: Get unique user IDs
+      const userIds = [...new Set([
+        ...requests.map(r => r.requester_id),
+        ...requests.map(r => r.approver_id).filter(Boolean) as string[]
+      ])];
+
+      // Step 3: Fetch profiles for those users
+      const profileMap = await fetchProfilesForUsers(userIds);
+
+      // Step 4: Merge profile data into requests
+      return enrichRequestsWithProfiles(requests, profileMap);
     },
   });
 }
@@ -113,19 +156,28 @@ export function usePendingApprovals() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      // Step 1: Fetch travel requests
+      const { data: requests, error } = await supabase
         .from('travel_requests')
-        .select(`
-          *,
-          requester:profiles!travel_requests_requester_id_fkey(full_name, email, department),
-          approver:profiles!travel_requests_approver_id_fkey(full_name, email)
-        `)
+        .select('*')
         .eq('approver_id', user.id)
         .eq('status', 'pending_approval')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as unknown as TravelRequest[];
+      if (!requests || requests.length === 0) return [];
+
+      // Step 2: Get unique user IDs
+      const userIds = [...new Set([
+        ...requests.map(r => r.requester_id),
+        ...requests.map(r => r.approver_id).filter(Boolean) as string[]
+      ])];
+
+      // Step 3: Fetch profiles
+      const profileMap = await fetchProfilesForUsers(userIds);
+
+      // Step 4: Merge profile data
+      return enrichRequestsWithProfiles(requests, profileMap);
     },
   });
 }
@@ -138,13 +190,10 @@ export function useApprovalRequests(statusFilter?: RequestStatus) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Step 1: Fetch travel requests
       let query = supabase
         .from('travel_requests')
-        .select(`
-          *,
-          requester:profiles!travel_requests_requester_id_fkey(full_name, email, department),
-          approver:profiles!travel_requests_approver_id_fkey(full_name, email)
-        `)
+        .select('*')
         .eq('approver_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -152,10 +201,21 @@ export function useApprovalRequests(statusFilter?: RequestStatus) {
         query = query.eq('status', statusFilter);
       }
 
-      const { data, error } = await query;
-
+      const { data: requests, error } = await query;
       if (error) throw error;
-      return data as unknown as TravelRequest[];
+      if (!requests || requests.length === 0) return [];
+
+      // Step 2: Get unique user IDs
+      const userIds = [...new Set([
+        ...requests.map(r => r.requester_id),
+        ...requests.map(r => r.approver_id).filter(Boolean) as string[]
+      ])];
+
+      // Step 3: Fetch profiles
+      const profileMap = await fetchProfilesForUsers(userIds);
+
+      // Step 4: Merge profile data
+      return enrichRequestsWithProfiles(requests, profileMap);
     },
   });
 }
@@ -167,14 +227,11 @@ export function useRequest(id: string | undefined) {
     queryFn: async () => {
       if (!id) return null;
 
+      // Step 1: Fetch request, passengers, and history in parallel
       const [requestResult, passengersResult, historyResult] = await Promise.all([
         supabase
           .from('travel_requests')
-          .select(`
-            *,
-            requester:profiles!travel_requests_requester_id_fkey(full_name, email, department),
-            approver:profiles!travel_requests_approver_id_fkey(full_name, email)
-          `)
+          .select('*')
           .eq('id', id)
           .maybeSingle(),
         supabase
@@ -184,10 +241,7 @@ export function useRequest(id: string | undefined) {
           .order('is_primary', { ascending: false }),
         supabase
           .from('request_history')
-          .select(`
-            *,
-            performer:profiles!request_history_performed_by_fkey(full_name)
-          `)
+          .select('*')
           .eq('request_id', id)
           .order('created_at', { ascending: false }),
       ]);
@@ -196,10 +250,43 @@ export function useRequest(id: string | undefined) {
       if (passengersResult.error) throw passengersResult.error;
       if (historyResult.error) throw historyResult.error;
 
+      if (!requestResult.data) {
+        return {
+          request: null,
+          passengers: passengersResult.data as RequestPassenger[],
+          history: [],
+        };
+      }
+
+      // Step 2: Collect all user IDs from request and history
+      const userIds = [...new Set([
+        requestResult.data.requester_id,
+        requestResult.data.approver_id,
+        ...historyResult.data.map(h => h.performed_by).filter(Boolean) as string[]
+      ].filter(Boolean) as string[])];
+
+      // Step 3: Fetch all profiles at once
+      const profileMap = await fetchProfilesForUsers(userIds);
+
+      // Step 4: Enrich request with profile data
+      const enrichedRequest: TravelRequest = {
+        ...requestResult.data,
+        requester: profileMap.get(requestResult.data.requester_id),
+        approver: requestResult.data.approver_id 
+          ? profileMap.get(requestResult.data.approver_id) || null 
+          : null,
+      };
+
+      // Step 5: Enrich history with performer data
+      const enrichedHistory: RequestHistory[] = historyResult.data.map(h => ({
+        ...h,
+        performer: h.performed_by ? { full_name: profileMap.get(h.performed_by)?.full_name || 'Unknown' } : null,
+      }));
+
       return {
-        request: requestResult.data as unknown as TravelRequest | null,
+        request: enrichedRequest,
         passengers: passengersResult.data as RequestPassenger[],
-        history: historyResult.data as unknown as RequestHistory[],
+        history: enrichedHistory,
       };
     },
     enabled: !!id,
