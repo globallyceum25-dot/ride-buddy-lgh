@@ -463,9 +463,9 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
                       </FormControl>
                       <SelectContent>
                         {loadingApprovers ? (
-                          <SelectItem value="" disabled>Loading...</SelectItem>
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading...</div>
                         ) : approvers.length === 0 ? (
-                          <SelectItem value="" disabled>No approvers available</SelectItem>
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">No approvers available</div>
                         ) : (
                           approvers.map((approver) => (
                             <SelectItem key={approver.user_id} value={approver.user_id}>
