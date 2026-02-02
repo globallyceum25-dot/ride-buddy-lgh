@@ -1,225 +1,269 @@
 
 
-# Modern Calendar View for Trip Schedule
+# Kanban-Style Allocations Board
 
 ## Overview
 
-Transform the Trip Schedule page with a visually stunning, modern calendar interface featuring interactive views, smooth animations, and an improved user experience. The design will incorporate contemporary UI patterns while maintaining the clean corporate aesthetic.
+Transform the Allocations module into a modern project management interface similar to MeisterTask/ClickUp, featuring drag-and-drop columns for each allocation stage from Dispatch to Complete.
 
 ## Current State
 
-- Basic Day/Week view toggle with simple card layout
-- Week view shows 7-column grid with trip counts
-- Day view shows TripCards in a vertical list
-- Standard date picker in a popover
-- Stats displayed in small cards at the top
+- Tab-based interface (Pending, Active, Pools)
+- Table layout for each section
+- Status updates via dropdown menu actions
+- Existing `@dnd-kit/core` and `@dnd-kit/sortable` packages installed
+- Allocation statuses: `scheduled` → `dispatched` → `in_progress` → `completed` (and `cancelled`)
 
-## Proposed Modern Calendar Features
+## Proposed Kanban Board Design
 
-### 1. Full Month Calendar View
+```text
++------------------------------------------------------------------+
+| Allocations Board                                      [Filters] |
++------------------------------------------------------------------+
+| [Pending]      | [Dispatched]   | [In Progress]   | [Completed] |
+| 6 items        | 3 items        | 2 items         | 8 items     |
++----------------+----------------+-----------------+--------------+
+| +------------+ | +------------+ | +-------------+ | +----------+ |
+| | REQ-2024   | | | REQ-2019   | | | REQ-2015    | | | REQ-2010 | |
+| | John Smith | | | Alice Wong | | | Bob Johnson | | | Jane Doe | |
+| | HQ → Site  | | | Lab → HQ   | | | Depot → Lab | | | HQ → Lab | |
+| | 9:00 AM    | | | 10:30 AM   | | | 2:00 PM     | | | 8:00 AM  | |
+| | [Toyota]   | | | [Honda]    | | | [Ford]      | | | [Toyota] | |
+| +------------+ | +------------+ | +-------------+ | +----------+ |
+|       ↕        |       ↕        |        ↕        |      ↕       |
++----------------+----------------+-----------------+--------------+
+```
 
-A new full month view with:
-- Grid layout showing all days of the month
-- Trip indicators as colored dots/pills on each day
-- Click-to-select navigation to day view
-- Current day highlighted
-- Days with trips show visual density indicators
+## Key Features
 
-### 2. Enhanced Week View with Timeline
+### 1. Kanban Columns
+- **Pending (Scheduled)**: Newly allocated trips awaiting dispatch
+- **Dispatched**: Driver notified, en route to pickup
+- **In Progress**: Trip actively underway
+- **Completed**: Successfully finished trips
 
-Replace the simple grid with a timeline-style view:
-- Horizontal timeline header with hours
-- Trips displayed as blocks on the timeline
-- Color-coded by status (scheduled, in progress, completed)
-- Hover cards showing trip details
-- Drag-to-scroll for timeline navigation
+### 2. Drag-and-Drop Status Transitions
+- Drag cards between columns to update status
+- Visual feedback during drag operations
+- Validation for allowed transitions (e.g., can't skip stages)
+- Auto-trigger modals for transitions requiring data (e.g., odometer readings)
 
-### 3. Modern Navigation Header
+### 3. Trip Cards
+- Compact, scannable design with key information
+- Request number, requester name, route summary
+- Scheduled time and assigned resources
+- Priority indicator and quick action buttons
+- Color-coded left border by priority
 
-- Sleek month/year navigation with smooth transitions
-- Today button for quick navigation
-- Animated view switcher (Day/Week/Month)
-- Mini calendar dropdown for date jumping
+### 4. Column Headers
+- Count badge showing items in each stage
+- Column color coding (similar to reference image)
+- Collapse/expand option for each column
 
-### 4. Trip Preview Cards
-
-- Hover-triggered preview popups on calendar events
-- Smooth scale-in animations
-- Quick action buttons visible on hover
-- Visual trip route indicator
-
-### 5. Visual Enhancements
-
-- Gradient backgrounds for selected dates
-- Status-based color coding throughout
-- Subtle shadows and depth
-- Smooth transitions between views
-- Loading skeletons with shimmer effect
+### 5. Filters & View Options
+- Date range filter
+- Vehicle/driver filter
+- Search by request number
+- Toggle between Kanban and Table views
 
 ## Implementation Plan
 
-### Phase 1: New Month View Component
+### Phase 1: Create Kanban Board Components
 
-Create `src/components/trips/MonthView.tsx`:
+**New Components:**
+| Component | Description |
+|-----------|-------------|
+| `KanbanBoard.tsx` | Main board layout with columns |
+| `KanbanColumn.tsx` | Individual column with drop zone |
+| `AllocationCard.tsx` | Draggable trip card component |
+| `KanbanFilters.tsx` | Filter bar for the board |
 
-```text
-+--------------------------------------------------+
-|  < February 2026 >         [Day][Week][Month]    |
-+--------------------------------------------------+
-| Mon | Tue | Wed | Thu | Fri | Sat | Sun          |
-+-----+-----+-----+-----+-----+-----+-----+--------+
-|  26 |  27 |  28 |  29 |  30 |  31 |  1  |        |
-|     |     |     |     |  ** |     |     |        |
-+-----+-----+-----+-----+-----+-----+-----+--------+
-|  2  |  3  |  4  |  5  |  6  |  7  |  8  |        |
-| *** | **  |     |  *  |     |     |     |        |
-+-----+-----+-----+-----+-----+-----+-----+--------+
-|  9  | 10  | 11  | 12  | 13  | 14  | 15  |        |
-|     |  *  |     |     | *** |     |     |        |
-+-----+-----+-----+-----+-----+-----+-----+--------+
-|     ... more rows ...                            |
-+--------------------------------------------------+
-* = trip indicator (colored by status)
-```
+### Phase 2: Implement Drag-and-Drop Logic
 
-### Phase 2: Enhanced Week Timeline View
+Using existing `@dnd-kit/core`:
+- Multi-column sortable context
+- Cross-column dragging support
+- Status validation on drop
+- Smooth animations and feedback
 
-Update `src/components/trips/WeekView.tsx`:
+### Phase 3: Status Transition Handling
 
-```text
-+--------------------------------------------------+
-| Time  | Mon 2  | Tue 3  | Wed 4  | Thu 5  | ...  |
-+-------+--------+--------+--------+--------+------+
-| 06:00 |        |        |        |        |      |
-+-------+--------+--------+--------+--------+------+
-| 08:00 | [Trip] |        |        | [Trip] |      |
-|       | 09:00  |        |        | 08:30  |      |
-+-------+--------+--------+--------+--------+------+
-| 10:00 |        | [Trip] |        |        |      |
-|       |        | 10:30  |        |        |      |
-+-------+--------+--------+--------+--------+------+
-| 12:00 |        |        | [Trip] |        |      |
-|       |        |        | 12:00  |        |      |
-+-------+--------+--------+--------+--------+------+
-```
+- Direct updates for simple transitions (Pending → Dispatched)
+- Modal triggers for data-required transitions:
+  - Dispatched → In Progress (requires starting odometer)
+  - In Progress → Completed (requires ending odometer)
 
-### Phase 3: Modern Navigation Component
+### Phase 4: Update Main Page
 
-Create `src/components/trips/CalendarNavigation.tsx`:
+- Add view toggle (Kanban/Table/Pools)
+- Integrate new components
+- Maintain existing table view as option
+- Mobile-responsive layout
 
-- Sleek header with month/year display
-- Animated chevron buttons for navigation
-- View mode tabs with pill-style indicator
-- "Today" quick action button
-- Mini calendar popup for date jumping
+## Technical Details
 
-### Phase 4: Trip Preview Hover Card
-
-Create `src/components/trips/TripPreviewCard.tsx`:
-
-- Uses HoverCard component for smooth popup
-- Shows trip summary, route, and status
-- Quick action buttons for start/complete
-- Animated entrance with scale-in effect
-
-### Phase 5: Update Main TripSchedule Page
-
-Integrate all components with:
-- View mode state (day/week/month)
-- Smooth transitions between views
-- Unified filtering across all views
-- Mobile-responsive layout adjustments
-
-## New Hooks
-
-### useMonthSchedule
-
-Fetch trip counts for entire month to populate calendar dots:
+### Kanban Column Data Structure
 
 ```typescript
-export function useMonthSchedule(month: Date) {
-  // Returns: { [date: string]: { count: number; hasInProgress: boolean; hasCompleted: boolean } }
+interface KanbanColumn {
+  id: AllocationStatus;
+  title: string;
+  color: string;
+  items: Allocation[];
+  allowedTransitionsFrom: AllocationStatus[];
 }
+
+const columns: KanbanColumn[] = [
+  {
+    id: 'scheduled',
+    title: 'Pending',
+    color: 'bg-blue-500',
+    items: [],
+    allowedTransitionsFrom: [],
+  },
+  {
+    id: 'dispatched',
+    title: 'Dispatched',
+    color: 'bg-amber-500',
+    items: [],
+    allowedTransitionsFrom: ['scheduled'],
+  },
+  {
+    id: 'in_progress',
+    title: 'In Progress',
+    color: 'bg-purple-500',
+    items: [],
+    allowedTransitionsFrom: ['dispatched'],
+  },
+  {
+    id: 'completed',
+    title: 'Completed',
+    color: 'bg-green-500',
+    items: [],
+    allowedTransitionsFrom: ['in_progress'],
+  },
+];
+```
+
+### Drag-and-Drop with @dnd-kit
+
+```typescript
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
+
+// Handle drag end
+const handleDragEnd = (event: DragEndEvent) => {
+  const { active, over } = event;
+  if (!over) return;
+  
+  const activeId = active.id as string;
+  const overId = over.id as string;
+  const activeColumn = findColumnForItem(activeId);
+  const overColumn = findColumn(overId) || findColumnForItem(overId);
+  
+  if (activeColumn !== overColumn) {
+    // Validate transition
+    if (!isValidTransition(activeColumn, overColumn)) {
+      toast.error('Invalid status transition');
+      return;
+    }
+    
+    // Check if transition needs data
+    if (requiresData(overColumn)) {
+      setTransitionDialog({ allocation, targetStatus: overColumn });
+      return;
+    }
+    
+    // Update status
+    updateStatus.mutate({ id: activeId, status: overColumn.id });
+  }
+};
+```
+
+### Allocation Card Component
+
+```typescript
+interface AllocationCardProps {
+  allocation: Allocation;
+  onStartTrip: () => void;
+  onCompleteTrip: () => void;
+  onCancel: () => void;
+}
+
+function AllocationCard({ allocation, ...actions }: AllocationCardProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({
+    id: allocation.id,
+  });
+  
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform) }}
+      className={cn(
+        'bg-card rounded-lg border shadow-sm p-3 cursor-grab',
+        isDragging && 'opacity-50 shadow-lg',
+        priorityColors[allocation.request?.priority]
+      )}
+      {...attributes}
+      {...listeners}
+    >
+      {/* Card content */}
+    </div>
+  );
+}
+```
+
+### Priority Color Coding
+
+```typescript
+const priorityColors = {
+  critical: 'border-l-4 border-l-red-500',
+  high: 'border-l-4 border-l-orange-500',
+  medium: 'border-l-4 border-l-yellow-500',
+  low: 'border-l-4 border-l-green-500',
+};
 ```
 
 ## Files to Create/Modify
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/trips/MonthView.tsx` | Create | Full month calendar grid |
-| `src/components/trips/CalendarNavigation.tsx` | Create | Modern navigation header |
-| `src/components/trips/TripPreviewCard.tsx` | Create | Hover preview for trips |
-| `src/components/trips/WeekView.tsx` | Update | Enhanced timeline layout |
-| `src/hooks/useTripSchedule.ts` | Update | Add useMonthSchedule hook |
-| `src/pages/TripSchedule.tsx` | Update | Integrate new components |
-| `src/index.css` | Update | Add calendar-specific animations |
-
-## Technical Details
-
-### Month View Data Structure
-
-```typescript
-interface MonthDay {
-  date: string;
-  dayNumber: number;
-  isCurrentMonth: boolean;
-  isToday: boolean;
-  isSelected: boolean;
-  trips: {
-    total: number;
-    scheduled: number;
-    inProgress: number;
-    completed: number;
-  };
-}
-```
-
-### View Transition Animation
-
-```css
-.calendar-view-enter {
-  opacity: 0;
-  transform: translateX(20px);
-}
-.calendar-view-enter-active {
-  opacity: 1;
-  transform: translateX(0);
-  transition: all 0.3s ease-out;
-}
-```
-
-### Status Color Palette
-
-| Status | Color | CSS Variable |
-|--------|-------|--------------|
-| Scheduled | Blue | `--info` |
-| Dispatched | Amber | `--warning` |
-| In Progress | Purple | `--primary` |
-| Completed | Green | `--success` |
-
-### Month Calendar Dot Indicators
-
-```tsx
-// Dots under each day number
-<div className="flex gap-0.5 justify-center mt-1">
-  {trips.scheduled > 0 && <div className="w-1.5 h-1.5 rounded-full bg-info" />}
-  {trips.inProgress > 0 && <div className="w-1.5 h-1.5 rounded-full bg-primary" />}
-  {trips.completed > 0 && <div className="w-1.5 h-1.5 rounded-full bg-success" />}
-</div>
-```
+| `src/components/allocations/KanbanBoard.tsx` | Create | Main board with DndContext |
+| `src/components/allocations/KanbanColumn.tsx` | Create | Droppable column component |
+| `src/components/allocations/AllocationCard.tsx` | Create | Draggable card component |
+| `src/components/allocations/KanbanFilters.tsx` | Create | Filter controls |
+| `src/hooks/useAllocations.ts` | Update | Add bulk status update hook |
+| `src/pages/Allocations.tsx` | Update | Integrate Kanban view |
 
 ## Mobile Responsiveness
 
-- Month view: Full width, compact day cells
-- Week view: Scrollable horizontally on small screens
-- Day view: Card-based layout maintained
-- Navigation: Simplified controls on mobile
-- View switcher: Icon-only on small screens
+- Horizontal scroll for columns on mobile
+- Swipe gestures for column navigation
+- Stacked column view option for small screens
+- Touch-optimized drag handles
 
-## Accessibility
+## Transition Validation Rules
 
-- Keyboard navigation for date selection
-- ARIA labels for calendar cells
-- Focus indicators on interactive elements
-- Screen reader announcements for date changes
+| From | To | Requires |
+|------|----|----------|
+| Scheduled | Dispatched | None |
+| Dispatched | In Progress | Starting odometer |
+| In Progress | Completed | Ending odometer |
+| Any | Cancelled | Confirmation |
+
+## Visual Enhancements
+
+- Gradient column headers matching reference design
+- Smooth drag animations with scale effect
+- Drop zone highlighting during drag
+- Card shadow elevation when dragging
+- Status completion indicator animations
 
