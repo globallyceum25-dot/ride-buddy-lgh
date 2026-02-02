@@ -82,10 +82,21 @@ export default function Approvals() {
                 </TableCell>
                 <TableCell>
                   <div>
-                    <p className="font-medium">{request.requester?.full_name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {request.requester?.department || request.requester?.email}
-                    </p>
+                    {request.is_guest_request ? (
+                      <>
+                        <p className="font-medium">{request.guest_name || 'Guest'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {request.guest_employee_id || request.guest_email || 'No details'}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-medium">{request.requester?.full_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {request.requester?.department || request.requester?.email}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="max-w-[150px] truncate">
