@@ -508,6 +508,7 @@ export type Database = {
           dropoff_location: string
           form_link_id: string | null
           guest_email: string | null
+          guest_employee_id: string | null
           guest_name: string | null
           guest_phone: string | null
           id: string
@@ -536,6 +537,7 @@ export type Database = {
           dropoff_location: string
           form_link_id?: string | null
           guest_email?: string | null
+          guest_employee_id?: string | null
           guest_name?: string | null
           guest_phone?: string | null
           id?: string
@@ -564,6 +566,7 @@ export type Database = {
           dropoff_location?: string
           form_link_id?: string | null
           guest_email?: string | null
+          guest_employee_id?: string | null
           guest_name?: string | null
           guest_phone?: string | null
           id?: string

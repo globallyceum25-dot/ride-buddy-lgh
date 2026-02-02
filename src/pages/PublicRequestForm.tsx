@@ -19,8 +19,9 @@ import { cn } from '@/lib/utils';
 const formSchema = z.object({
   // Guest info
   guest_name: z.string().min(2, 'Name must be at least 2 characters'),
+  guest_employee_id: z.string().min(1, 'Employee ID is required'),
   guest_email: z.string().email('Please enter a valid email'),
-  guest_phone: z.string().optional(),
+  guest_phone: z.string().min(10, 'Phone number is required (min 10 digits)'),
   // Trip details
   trip_type: z.enum(['one_way', 'round_trip', 'multi_stop']),
   pickup_location: z.string().min(3, 'Pickup location is required'),
@@ -48,6 +49,7 @@ export default function PublicRequestForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       guest_name: '',
+      guest_employee_id: '',
       guest_email: '',
       guest_phone: '',
       trip_type: 'one_way',
@@ -84,6 +86,7 @@ export default function PublicRequestForm() {
         token,
         guestInfo: {
           name: values.guest_name,
+          employee_id: values.guest_employee_id,
           email: values.guest_email,
           phone: values.guest_phone,
         },
@@ -172,19 +175,34 @@ export default function PublicRequestForm() {
                 <CardTitle className="text-lg">Your Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="guest_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="John Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="guest_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="guest_employee_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Employee ID *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="EMP001" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -204,7 +222,7 @@ export default function PublicRequestForm() {
                     name="guest_phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone</FormLabel>
+                        <FormLabel>Phone *</FormLabel>
                         <FormControl>
                           <Input placeholder="+1 234 567 8900" {...field} />
                         </FormControl>
