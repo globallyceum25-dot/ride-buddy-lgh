@@ -1,269 +1,210 @@
 
-
-# Kanban-Style Allocations Board
+# Pool Grouping on Kanban Board
 
 ## Overview
 
-Transform the Allocations module into a modern project management interface similar to MeisterTask/ClickUp, featuring drag-and-drop columns for each allocation stage from Dispatch to Complete.
+Add visual grouping for trips that share the same `pool_id`, displaying them in a connected container that makes it clear they are part of the same shared ride. This improves coordination visibility for dispatchers managing pooled trips.
 
 ## Current State
 
-- Tab-based interface (Pending, Active, Pools)
-- Table layout for each section
-- Status updates via dropdown menu actions
-- Existing `@dnd-kit/core` and `@dnd-kit/sortable` packages installed
-- Allocation statuses: `scheduled` → `dispatched` → `in_progress` → `completed` (and `cancelled`)
+- Individual cards show "Pooled Trip" banner with accent highlighting
+- Cards with the same `pool_id` are scattered within columns
+- No visual connection between trips in the same pool
+- Each card rendered independently
 
-## Proposed Kanban Board Design
+## Proposed Design
 
 ```text
-+------------------------------------------------------------------+
-| Allocations Board                                      [Filters] |
-+------------------------------------------------------------------+
-| [Pending]      | [Dispatched]   | [In Progress]   | [Completed] |
-| 6 items        | 3 items        | 2 items         | 8 items     |
-+----------------+----------------+-----------------+--------------+
-| +------------+ | +------------+ | +-------------+ | +----------+ |
-| | REQ-2024   | | | REQ-2019   | | | REQ-2015    | | | REQ-2010 | |
-| | John Smith | | | Alice Wong | | | Bob Johnson | | | Jane Doe | |
-| | HQ → Site  | | | Lab → HQ   | | | Depot → Lab | | | HQ → Lab | |
-| | 9:00 AM    | | | 10:30 AM   | | | 2:00 PM     | | | 8:00 AM  | |
-| | [Toyota]   | | | [Honda]    | | | [Ford]      | | | [Toyota] | |
-| +------------+ | +------------+ | +-------------+ | +----------+ |
-|       ↕        |       ↕        |        ↕        |      ↕       |
-+----------------+----------------+-----------------+--------------+
++------------------+
+| [Dispatched] 5   |
++------------------+
+| +==============+ |  ← Pool Group Container (dashed border)
+| | Pool #P-001  | |  ← Pool Header with pool number
+| | 3 passengers | |  ← Total passenger count
+| +------------- + |
+| | Card 1       | |  ← Individual allocation cards
+| | REQ-2024     | |    stacked within the group
+| +--------------+ |
+| | Card 2       | |
+| | REQ-2025     | |
+| +--------------+ |
+| +==============+ |
+|                  |
+| +------------+   |  ← Non-pooled card (standalone)
+| | REQ-2026   |   |
+| +------------+   |
++------------------+
 ```
 
 ## Key Features
 
-### 1. Kanban Columns
-- **Pending (Scheduled)**: Newly allocated trips awaiting dispatch
-- **Dispatched**: Driver notified, en route to pickup
-- **In Progress**: Trip actively underway
-- **Completed**: Successfully finished trips
+### 1. Pool Group Container
+- Rounded container with dashed/dotted accent border
+- Gradient background matching pool theme
+- Visual distinction from standalone cards
 
-### 2. Drag-and-Drop Status Transitions
-- Drag cards between columns to update status
-- Visual feedback during drag operations
-- Validation for allowed transitions (e.g., can't skip stages)
-- Auto-trigger modals for transitions requiring data (e.g., odometer readings)
+### 2. Pool Header
+- Pool number display (P-001, etc.)
+- Total passenger count badge
+- Shared vehicle/driver info
+- Collapse/expand toggle for large pools
 
-### 3. Trip Cards
-- Compact, scannable design with key information
-- Request number, requester name, route summary
-- Scheduled time and assigned resources
-- Priority indicator and quick action buttons
-- Color-coded left border by priority
+### 3. Grouped Card Styling
+- Cards within pool have reduced spacing
+- Connected appearance with subtle overlap or tight margins
+- Maintains individual card functionality (drag, actions)
 
-### 4. Column Headers
-- Count badge showing items in each stage
-- Column color coding (similar to reference image)
-- Collapse/expand option for each column
-
-### 5. Filters & View Options
-- Date range filter
-- Vehicle/driver filter
-- Search by request number
-- Toggle between Kanban and Table views
+### 4. Drag Behavior Options
+- **Individual drag**: Move single trip out of pool (with confirmation)
+- **Group drag**: Move entire pool together when dragging header
 
 ## Implementation Plan
 
-### Phase 1: Create Kanban Board Components
+### Phase 1: Create Pool Group Component
 
-**New Components:**
-| Component | Description |
-|-----------|-------------|
-| `KanbanBoard.tsx` | Main board layout with columns |
-| `KanbanColumn.tsx` | Individual column with drop zone |
-| `AllocationCard.tsx` | Draggable trip card component |
-| `KanbanFilters.tsx` | Filter bar for the board |
+**New Component: `PoolGroup.tsx`**
 
-### Phase 2: Implement Drag-and-Drop Logic
+Wrapper component that renders all allocations sharing a `pool_id`:
 
-Using existing `@dnd-kit/core`:
-- Multi-column sortable context
-- Cross-column dragging support
-- Status validation on drop
-- Smooth animations and feedback
+```typescript
+interface PoolGroupProps {
+  poolId: string;
+  allocations: Allocation[];
+  onStartTrip: (allocation: Allocation) => void;
+  // ... other handlers
+}
+```
 
-### Phase 3: Status Transition Handling
+### Phase 2: Update KanbanColumn
 
-- Direct updates for simple transitions (Pending → Dispatched)
-- Modal triggers for data-required transitions:
-  - Dispatched → In Progress (requires starting odometer)
-  - In Progress → Completed (requires ending odometer)
+Modify the rendering logic to:
+1. Separate allocations into pooled and non-pooled
+2. Group pooled allocations by `pool_id`
+3. Render `PoolGroup` for each pool
+4. Render standalone `AllocationCard` for non-pooled
 
-### Phase 4: Update Main Page
+### Phase 3: Sort Logic
 
-- Add view toggle (Kanban/Table/Pools)
-- Integrate new components
-- Maintain existing table view as option
-- Mobile-responsive layout
+Order items within each column:
+1. Pool groups first (sorted by earliest scheduled pickup)
+2. Non-pooled cards after (sorted by scheduled pickup)
+
+## Files to Create/Modify
+
+| File | Action | Description |
+|------|---------|-------------|
+| `src/components/allocations/PoolGroup.tsx` | Create | Pool group container component |
+| `src/components/allocations/KanbanColumn.tsx` | Update | Group allocations by pool_id |
+| `src/components/allocations/AllocationCard.tsx` | Update | Add `isGrouped` prop for reduced spacing |
 
 ## Technical Details
 
-### Kanban Column Data Structure
+### Grouping Logic in KanbanColumn
 
 ```typescript
-interface KanbanColumn {
-  id: AllocationStatus;
-  title: string;
-  color: string;
-  items: Allocation[];
-  allowedTransitionsFrom: AllocationStatus[];
-}
-
-const columns: KanbanColumn[] = [
-  {
-    id: 'scheduled',
-    title: 'Pending',
-    color: 'bg-blue-500',
-    items: [],
-    allowedTransitionsFrom: [],
-  },
-  {
-    id: 'dispatched',
-    title: 'Dispatched',
-    color: 'bg-amber-500',
-    items: [],
-    allowedTransitionsFrom: ['scheduled'],
-  },
-  {
-    id: 'in_progress',
-    title: 'In Progress',
-    color: 'bg-purple-500',
-    items: [],
-    allowedTransitionsFrom: ['dispatched'],
-  },
-  {
-    id: 'completed',
-    title: 'Completed',
-    color: 'bg-green-500',
-    items: [],
-    allowedTransitionsFrom: ['in_progress'],
-  },
-];
-```
-
-### Drag-and-Drop with @dnd-kit
-
-```typescript
-import {
-  DndContext,
-  DragOverlay,
-  closestCorners,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
-
-// Handle drag end
-const handleDragEnd = (event: DragEndEvent) => {
-  const { active, over } = event;
-  if (!over) return;
+// Separate pooled and non-pooled allocations
+const { pooledGroups, standaloneAllocations } = useMemo(() => {
+  const pooled: Record<string, Allocation[]> = {};
+  const standalone: Allocation[] = [];
   
-  const activeId = active.id as string;
-  const overId = over.id as string;
-  const activeColumn = findColumnForItem(activeId);
-  const overColumn = findColumn(overId) || findColumnForItem(overId);
-  
-  if (activeColumn !== overColumn) {
-    // Validate transition
-    if (!isValidTransition(activeColumn, overColumn)) {
-      toast.error('Invalid status transition');
-      return;
+  allocations.forEach((allocation) => {
+    if (allocation.pool_id) {
+      if (!pooled[allocation.pool_id]) {
+        pooled[allocation.pool_id] = [];
+      }
+      pooled[allocation.pool_id].push(allocation);
+    } else {
+      standalone.push(allocation);
     }
-    
-    // Check if transition needs data
-    if (requiresData(overColumn)) {
-      setTransitionDialog({ allocation, targetStatus: overColumn });
-      return;
-    }
-    
-    // Update status
-    updateStatus.mutate({ id: activeId, status: overColumn.id });
-  }
-};
-```
-
-### Allocation Card Component
-
-```typescript
-interface AllocationCardProps {
-  allocation: Allocation;
-  onStartTrip: () => void;
-  onCompleteTrip: () => void;
-  onCancel: () => void;
-}
-
-function AllocationCard({ allocation, ...actions }: AllocationCardProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({
-    id: allocation.id,
   });
   
+  return { 
+    pooledGroups: Object.entries(pooled),
+    standaloneAllocations: standalone,
+  };
+}, [allocations]);
+```
+
+### PoolGroup Component Structure
+
+```typescript
+function PoolGroup({ poolId, allocations, ...handlers }: PoolGroupProps) {
+  // Fetch pool details (number, total passengers)
+  const totalPassengers = allocations.reduce(
+    (sum, a) => sum + (a.request?.passenger_count || 0), 0
+  );
+  
   return (
-    <div
-      ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform) }}
-      className={cn(
-        'bg-card rounded-lg border shadow-sm p-3 cursor-grab',
-        isDragging && 'opacity-50 shadow-lg',
-        priorityColors[allocation.request?.priority]
-      )}
-      {...attributes}
-      {...listeners}
-    >
-      {/* Card content */}
+    <div className="rounded-lg border-2 border-dashed border-accent bg-accent/5 p-2">
+      {/* Pool Header */}
+      <div className="flex items-center justify-between mb-2 px-2">
+        <div className="flex items-center gap-2">
+          <Users className="h-4 w-4 text-accent" />
+          <span className="font-medium text-sm">Pooled Trip</span>
+        </div>
+        <Badge variant="secondary">
+          {totalPassengers} passengers
+        </Badge>
+      </div>
+      
+      {/* Grouped Cards */}
+      <div className="space-y-1.5">
+        {allocations.map((allocation) => (
+          <AllocationCard
+            key={allocation.id}
+            allocation={allocation}
+            isGrouped
+            {...handlers}
+          />
+        ))}
+      </div>
     </div>
   );
 }
 ```
 
-### Priority Color Coding
+### Card Styling Updates
+
+Add `isGrouped` prop to `AllocationCard` for visual adjustments:
 
 ```typescript
-const priorityColors = {
-  critical: 'border-l-4 border-l-red-500',
-  high: 'border-l-4 border-l-orange-500',
-  medium: 'border-l-4 border-l-yellow-500',
-  low: 'border-l-4 border-l-green-500',
-};
+// When isGrouped=true:
+// - Remove the individual "Pooled Trip" banner (shown in group header)
+// - Reduce padding/margins
+// - Maintain left border priority styling
 ```
 
-## Files to Create/Modify
+## Visual Styling
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/components/allocations/KanbanBoard.tsx` | Create | Main board with DndContext |
-| `src/components/allocations/KanbanColumn.tsx` | Create | Droppable column component |
-| `src/components/allocations/AllocationCard.tsx` | Create | Draggable card component |
-| `src/components/allocations/KanbanFilters.tsx` | Create | Filter controls |
-| `src/hooks/useAllocations.ts` | Update | Add bulk status update hook |
-| `src/pages/Allocations.tsx` | Update | Integrate Kanban view |
+### Pool Group Container
 
-## Mobile Responsiveness
+```typescript
+cn(
+  'rounded-lg border-2 border-dashed border-accent/50',
+  'bg-gradient-to-br from-accent/10 to-accent/5',
+  'p-2 mb-3'
+)
+```
 
-- Horizontal scroll for columns on mobile
-- Swipe gestures for column navigation
-- Stacked column view option for small screens
-- Touch-optimized drag handles
+### Pool Header
 
-## Transition Validation Rules
+```typescript
+cn(
+  'flex items-center justify-between',
+  'px-2 py-1.5 rounded-md bg-accent/20',
+  'text-accent-foreground text-sm font-medium'
+)
+```
 
-| From | To | Requires |
-|------|----|----------|
-| Scheduled | Dispatched | None |
-| Dispatched | In Progress | Starting odometer |
-| In Progress | Completed | Ending odometer |
-| Any | Cancelled | Confirmation |
+### Grouped Cards
 
-## Visual Enhancements
+- Reduced vertical spacing: `space-y-1.5` instead of `space-y-3`
+- Cards hide individual pool banner
+- Maintain drag handles and actions
 
-- Gradient column headers matching reference design
-- Smooth drag animations with scale effect
-- Drop zone highlighting during drag
-- Card shadow elevation when dragging
-- Status completion indicator animations
+## Mobile Considerations
+
+- Pool groups maintain structure on mobile
+- Collapsible groups for large pools
+- Touch-friendly expand/collapse
 
