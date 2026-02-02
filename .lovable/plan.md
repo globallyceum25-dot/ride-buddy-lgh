@@ -1,150 +1,157 @@
 
-# Add Multi-Stop Locations Feature
+# Link Public Form Links to Departments
 
 ## Overview
 
-When users select "Multi Stop" as the trip type, they should be able to add multiple intermediate stops between the pickup and final destination. This feature needs to be implemented in both the internal request form (for authenticated users) and the public request form (for guest users).
+This feature will allow administrators to associate each public form link with a specific department. When a guest submits a request through a public link, the department association will be carried over to the travel request.
 
 ## Current State
 
-- Both forms (`RequestDialog.tsx` and `PublicRequestForm.tsx`) allow selecting "Multi Stop" as a trip type
-- No UI exists to add intermediate stops
-- No database structure exists to store stops
+- `public_form_links` table has no `department_id` column
+- Public form links can specify a default approver but not a department
+- Travel requests have a `cost_center` field (text) but rely on the requester's profile for department context
+- Departments are managed in Settings with `id`, `name`, `code`, and `is_active` fields
 
 ## Implementation Plan
 
-### 1. Database Schema
+### 1. Database Schema Update
 
-Create a new table to store intermediate stops for multi-stop trips:
+Add a `department_id` column to the `public_form_links` table:
+
+| Column | Type | Description |
+|--------|------|-------------|
+| department_id | UUID (nullable) | Foreign key to departments table |
+
+### 2. Update Create Form Link Dialog
+
+Add a department selector in `CreateFormLinkDialog.tsx`:
 
 ```text
-request_stops
-├── id (UUID, Primary Key)
-├── request_id (UUID, Foreign Key → travel_requests)
-├── location (TEXT, the stop address)
-├── stop_order (INTEGER, sequence of stops)
-└── created_at (TIMESTAMPTZ)
++------------------------------------------+
+| Link Name *                              |
+| [HR Department Requests        ]         |
++------------------------------------------+
+| Department                               |
+| [Select department           v]          |
+|   - General Secretariat                  |
+|   - Governance                           |
+|   - IT Pillar                            |
++------------------------------------------+
+| Default Approver                         |
+| [Select an approver          v]          |
++------------------------------------------+
+| Expiry Date                              |
+| [No expiry                   v]          |
++------------------------------------------+
 ```
 
-### 2. Update Internal Request Form (`RequestDialog.tsx`)
+### 3. Update Public Form Links Table Display
 
-Add a "Stops" section that appears when `trip_type === 'multi_stop'`:
+Show the associated department in the links table:
 
-| Element | Description |
-|---------|-------------|
-| Stops Section | Appears between Pickup and Dropoff fields |
-| Add Stop Button | Button to add a new intermediate stop |
-| Stop Input | Text input for each stop location |
-| Remove Button | Trash icon to remove a stop |
-| Stop Order | Automatic numbering (Stop 1, Stop 2, etc.) |
+| Name | Department | Link | Submissions | Expires | Status | Actions |
+|------|------------|------|-------------|---------|--------|---------|
 
-**UI Flow:**
-```text
-┌─────────────────────────────────────┐
-│ Trip Type: [Multi Stop ▼]           │
-├─────────────────────────────────────┤
-│ Pickup Location: [___________]      │
-├─────────────────────────────────────┤
-│ Intermediate Stops        [+ Add]   │
-│ ┌─────────────────────────────────┐ │
-│ │ Stop 1: [Location A    ] [🗑]   │ │
-│ │ Stop 2: [Location B    ] [🗑]   │ │
-│ └─────────────────────────────────┘ │
-├─────────────────────────────────────┤
-│ Final Destination: [___________]    │
-└─────────────────────────────────────┘
-```
-
-### 3. Update Public Request Form (`PublicRequestForm.tsx`)
-
-Same UI pattern as the internal form - show stops section when multi_stop is selected.
-
-### 4. Update Hooks and Submission Logic
-
-**`useRequests.ts`:**
-- Add `stops` to the request creation input
-- Insert stops into `request_stops` table after creating the travel request
-- Fetch stops when loading request details
+### 4. Update Hooks
 
 **`usePublicRequest.ts`:**
-- Add `stops` to the request data interface
+- Add `department_id` to the create mutation input
+- Include department in form links query with join
 
-### 5. Update Edge Function
+### 5. Update Edge Function (Optional Enhancement)
 
 **`submit-public-request/index.ts`:**
-- Accept `stops` array in the request body
-- Insert stops into `request_stops` table for guest submissions
+- Fetch the department name from the linked department
+- Store department info on the travel request (if department field exists) or in notes
+
+### 6. Update Travel Request Submission
+
+When a request is submitted via a public form link with a department, the department association can be:
+- Stored in a notes/metadata field on the request
+- Used for reporting and filtering purposes
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `supabase/migrations/` | New migration for `request_stops` table |
-| `src/components/requests/RequestDialog.tsx` | Add stops state, UI section, and submission logic |
-| `src/pages/PublicRequestForm.tsx` | Add stops state and UI section |
-| `src/hooks/useRequests.ts` | Update types and mutation to handle stops |
-| `src/hooks/usePublicRequest.ts` | Update interface to include stops |
-| `supabase/functions/submit-public-request/index.ts` | Handle stops insertion |
+| `supabase/migrations/` | Add `department_id` column to `public_form_links` |
+| `src/integrations/supabase/types.ts` | Auto-regenerated after migration |
+| `src/components/settings/CreateFormLinkDialog.tsx` | Add department selector |
+| `src/components/settings/PublicFormLinks.tsx` | Display department column |
+| `src/hooks/usePublicRequest.ts` | Include department in queries and mutations |
+| `supabase/functions/submit-public-request/index.ts` | Pass department to request (optional) |
 
 ## Technical Details
-
-### Form Schema Update (RequestDialog.tsx)
-
-Add stops to the form schema using local state (similar to passengers):
-
-```typescript
-const [stops, setStops] = useState<string[]>([]);
-
-const addStop = () => setStops([...stops, '']);
-const removeStop = (index: number) => setStops(stops.filter((_, i) => i !== index));
-const updateStop = (index: number, value: string) => {
-  const updated = [...stops];
-  updated[index] = value;
-  setStops(updated);
-};
-```
 
 ### Database Migration
 
 ```sql
-CREATE TABLE public.request_stops (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  request_id UUID NOT NULL REFERENCES public.travel_requests(id) ON DELETE CASCADE,
-  location TEXT NOT NULL,
-  stop_order INTEGER NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE (request_id, stop_order)
-);
+-- Add department_id to public_form_links
+ALTER TABLE public.public_form_links
+ADD COLUMN department_id UUID REFERENCES public.departments(id) ON DELETE SET NULL;
 
-ALTER TABLE public.request_stops ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view stops of requests they can view"
-  ON public.request_stops FOR SELECT
-  USING (public.can_view_request(auth.uid(), request_id));
-
-CREATE POLICY "Users can insert stops for their own requests"
-  ON public.request_stops FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.travel_requests
-      WHERE id = request_id AND requester_id = auth.uid()
-    )
-  );
+-- Add index for performance
+CREATE INDEX idx_public_form_links_department ON public.public_form_links(department_id);
 ```
 
-### Submission Logic
-
-On form submit, after creating the travel request, insert stops:
+### Form Link Query with Department
 
 ```typescript
-// After creating request
-if (stops.length > 0) {
-  await supabase.from('request_stops').insert(
-    stops.map((location, index) => ({
-      request_id: newRequest.id,
-      location,
-      stop_order: index + 1,
-    }))
-  );
-}
+const { data, error } = await supabase
+  .from('public_form_links')
+  .select('*, department:departments(id, name, code)')
+  .order('created_at', { ascending: false });
 ```
+
+### Create Form Link with Department
+
+```typescript
+await supabase.from('public_form_links').insert({
+  name: values.name,
+  description: values.description,
+  default_approver_id: values.default_approver_id,
+  department_id: values.department_id, // NEW
+  expires_at: values.expires_at,
+  created_by: user.id,
+});
+```
+
+### UI Component Update (CreateFormLinkDialog)
+
+```typescript
+// Add department field to form schema
+department_id: z.string().optional(),
+
+// Add departments query
+const { data: departments } = useDepartments();
+
+// Add department selector in form
+<FormField
+  name="department_id"
+  render={({ field }) => (
+    <FormItem>
+      <FormLabel>Department</FormLabel>
+      <Select onValueChange={field.onChange} value={field.value}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select department" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none">No department</SelectItem>
+          {departments?.filter(d => d.is_active).map(dept => (
+            <SelectItem key={dept.id} value={dept.id}>
+              {dept.name} {dept.code && `(${dept.code})`}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </FormItem>
+  )}
+/>
+```
+
+## Benefits
+
+1. **Better Organization**: Links can be categorized by department
+2. **Reporting**: Filter and analyze requests by department
+3. **Access Control**: Future enhancement to restrict approvers by department
+4. **Clarity**: Admins can quickly see which department each link serves
