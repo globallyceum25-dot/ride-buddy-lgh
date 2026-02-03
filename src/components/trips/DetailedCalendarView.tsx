@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useCallback, useEffect } from 'react';
 import { 
   format, 
   startOfMonth, 
@@ -48,6 +48,9 @@ interface CalendarDayCellProps {
   isSelected: boolean;
   isToday: boolean;
   onSelect: (date: Date) => void;
+  onKeyDown: (e: React.KeyboardEvent) => void;
+  tabIndex: number;
+  cellRef: (el: HTMLButtonElement | null) => void;
   isLastInRow: boolean;
   isLastRow: boolean;
 }
@@ -59,15 +62,26 @@ function CalendarDayCell({
   isSelected, 
   isToday: isDayToday,
   onSelect,
+  onKeyDown,
+  tabIndex,
+  cellRef,
   isLastInRow,
   isLastRow
 }: CalendarDayCellProps) {
   const visibleTrips = trips.slice(0, 3);
   const hiddenCount = trips.length - visibleTrips.length;
 
+  const ariaLabel = `${format(day, 'EEEE, MMMM d')}${trips.length ? `, ${trips.length} trip${trips.length !== 1 ? 's' : ''}` : ''}`;
+
   return (
     <button
+      ref={cellRef}
+      role="gridcell"
+      aria-selected={isSelected}
+      aria-label={ariaLabel}
+      tabIndex={tabIndex}
       onClick={() => onSelect(day)}
+      onKeyDown={onKeyDown}
       className={cn(
         'relative min-h-[100px] w-full p-2 border-r border-b text-left transition-all duration-150',
         'hover:bg-accent/50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset',
@@ -135,13 +149,82 @@ function CalendarGrid({
   onSelectDate: (date: Date) => void;
   calendarDays: Date[];
 }) {
+  const cellRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  
+  // Initialize focused index to selected date or today
+  const [focusedIndex, setFocusedIndex] = useState<number>(() => {
+    const selectedIdx = calendarDays.findIndex(d => isSameDay(d, selectedDate));
+    if (selectedIdx >= 0) return selectedIdx;
+    const todayIdx = calendarDays.findIndex(d => isToday(d));
+    return todayIdx >= 0 ? todayIdx : 0;
+  });
+
+  // Update focused index when selected date changes
+  useEffect(() => {
+    const selectedIdx = calendarDays.findIndex(d => isSameDay(d, selectedDate));
+    if (selectedIdx >= 0 && selectedIdx !== focusedIndex) {
+      setFocusedIndex(selectedIdx);
+    }
+  }, [selectedDate, calendarDays]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent, index: number) => {
+    let newIndex = index;
+    const totalDays = calendarDays.length;
+
+    switch (e.key) {
+      case 'ArrowLeft':
+        e.preventDefault();
+        newIndex = index > 0 ? index - 1 : index;
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        newIndex = index < totalDays - 1 ? index + 1 : index;
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        newIndex = index >= 7 ? index - 7 : index;
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        newIndex = index + 7 < totalDays ? index + 7 : index;
+        break;
+      case 'Home':
+        e.preventDefault();
+        // Start of current week (row)
+        newIndex = Math.floor(index / 7) * 7;
+        break;
+      case 'End':
+        e.preventDefault();
+        // End of current week (row)
+        newIndex = Math.min(Math.floor(index / 7) * 7 + 6, totalDays - 1);
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        onSelectDate(calendarDays[index]);
+        return;
+      default:
+        return;
+    }
+
+    if (newIndex !== index) {
+      setFocusedIndex(newIndex);
+      cellRefs.current[newIndex]?.focus();
+    }
+  }, [calendarDays, onSelectDate]);
+
   return (
-    <div className="h-full flex flex-col bg-card rounded-xl border shadow-sm overflow-hidden">
+    <div 
+      role="grid" 
+      aria-label="Trip schedule calendar"
+      className="h-full flex flex-col bg-card rounded-xl border shadow-sm overflow-hidden"
+    >
       {/* Weekday headers */}
-      <div className="grid grid-cols-7 border-b bg-muted/30">
+      <div role="row" className="grid grid-cols-7 border-b bg-muted/30">
         {WEEKDAYS.map((day) => (
           <div 
-            key={day} 
+            key={day}
+            role="columnheader"
             className="py-3 text-center text-sm font-semibold text-muted-foreground"
           >
             {day}
@@ -150,24 +233,39 @@ function CalendarGrid({
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 flex-1">
-        {calendarDays.map((day, index) => {
-          const dateStr = format(day, 'yyyy-MM-dd');
-          const dayData = tripData[dateStr];
-          const trips = dayData?.trips || [];
+      <div className="flex-1 flex flex-col">
+        {/* Render rows */}
+        {Array.from({ length: Math.ceil(calendarDays.length / 7) }).map((_, rowIndex) => {
+          const startIdx = rowIndex * 7;
+          const weekDays = calendarDays.slice(startIdx, startIdx + 7);
+          const isLastRow = rowIndex === Math.ceil(calendarDays.length / 7) - 1;
           
           return (
-            <CalendarDayCell
-              key={dateStr}
-              day={day}
-              trips={trips}
-              isCurrentMonth={isSameMonth(day, currentDate)}
-              isSelected={isSameDay(day, selectedDate)}
-              isToday={isToday(day)}
-              onSelect={onSelectDate}
-              isLastInRow={index % 7 === 6}
-              isLastRow={index >= calendarDays.length - 7}
-            />
+            <div key={rowIndex} role="row" className="grid grid-cols-7 flex-1">
+              {weekDays.map((day, colIndex) => {
+                const index = startIdx + colIndex;
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const dayData = tripData[dateStr];
+                const trips = dayData?.trips || [];
+                
+                return (
+                  <CalendarDayCell
+                    key={dateStr}
+                    day={day}
+                    trips={trips}
+                    isCurrentMonth={isSameMonth(day, currentDate)}
+                    isSelected={isSameDay(day, selectedDate)}
+                    isToday={isToday(day)}
+                    onSelect={onSelectDate}
+                    onKeyDown={(e) => handleKeyDown(e, index)}
+                    tabIndex={index === focusedIndex ? 0 : -1}
+                    cellRef={(el) => { cellRefs.current[index] = el; }}
+                    isLastInRow={colIndex === 6}
+                    isLastRow={isLastRow}
+                  />
+                );
+              })}
+            </div>
           );
         })}
       </div>
