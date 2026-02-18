@@ -8,12 +8,15 @@ const corsHeaders = {
 
 interface NotificationPayload {
   recipientUserId: string;
-  type: "overdue_closed" | "overdue_rescheduled";
+  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned";
   details: {
     requestNumber: string;
     route: string;
     reason?: string;
     newPickupDate?: string;
+    vehicleInfo?: string;
+    driverName?: string;
+    pickupDatetime?: string;
   };
 }
 
@@ -58,29 +61,42 @@ Deno.serve(async (req) => {
       telegram: false,
     };
 
-    // Build messages
-    const isClose = type === "overdue_closed";
-    const actionLabel = isClose ? "Closed" : "Rescheduled";
-    const subject = `Travel Request ${details.requestNumber} ${actionLabel}`;
-
+    // Build messages based on type
+    let subject: string;
     let bodyText: string;
-    if (isClose) {
-      bodyText = `Your travel request ${details.requestNumber} (${details.route}) has been closed because the pickup date has passed. Reason: ${details.reason || "N/A"}.`;
-    } else {
-      const dateStr = details.newPickupDate
-        ? new Date(details.newPickupDate).toLocaleString("en-US", {
+
+    if (type === "allocation_assigned") {
+      subject = `Travel Request ${details.requestNumber} - Vehicle & Driver Assigned`;
+      const pickupStr = details.pickupDatetime
+        ? new Date(details.pickupDatetime).toLocaleString("en-US", {
             dateStyle: "long",
             timeStyle: "short",
           })
         : "TBD";
-      bodyText = `Your travel request ${details.requestNumber} (${details.route}) has been rescheduled. New pickup: ${dateStr}.`;
+      bodyText = `Your travel request ${details.requestNumber} (${details.route}) has been assigned.\n\nVehicle: ${details.vehicleInfo || "N/A"}\nDriver: ${details.driverName || "N/A"}\nPickup: ${pickupStr}`;
+    } else {
+      const isClose = type === "overdue_closed";
+      const actionLabel = isClose ? "Closed" : "Rescheduled";
+      subject = `Travel Request ${details.requestNumber} ${actionLabel}`;
+
+      if (isClose) {
+        bodyText = `Your travel request ${details.requestNumber} (${details.route}) has been closed because the pickup date has passed. Reason: ${details.reason || "N/A"}.`;
+      } else {
+        const dateStr = details.newPickupDate
+          ? new Date(details.newPickupDate).toLocaleString("en-US", {
+              dateStyle: "long",
+              timeStyle: "short",
+            })
+          : "TBD";
+        bodyText = `Your travel request ${details.requestNumber} (${details.route}) has been rescheduled. New pickup: ${dateStr}.`;
+      }
     }
 
     const emailHtml = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #1a1a1a;">Travel Request ${actionLabel}</h2>
+        <h2 style="color: #1a1a1a;">${subject}</h2>
         <p>Hi ${profile.full_name},</p>
-        <p>${bodyText}</p>
+        <p>${bodyText.replace(/\n/g, "<br/>")}</p>
         <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 20px 0;" />
         <p style="color: #666; font-size: 12px;">This is an automated notification from your Travel Management System.</p>
       </div>
@@ -117,7 +133,9 @@ Deno.serve(async (req) => {
     const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (TELEGRAM_BOT_TOKEN && profile.telegram_chat_id) {
       try {
-        const telegramText = `<b>🚗 ${subject}</b>\n\n${bodyText}`;
+        const telegramText = type === "allocation_assigned"
+          ? `<b>🚗 ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Vehicle:</b> ${details.vehicleInfo || "N/A"}\n<b>Driver:</b> ${details.driverName || "N/A"}\n<b>Pickup:</b> ${details.pickupDatetime ? new Date(details.pickupDatetime).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" }) : "TBD"}`
+          : `<b>🚗 ${subject}</b>\n\n${bodyText}`;
         const tgRes = await fetch(
           `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
           {

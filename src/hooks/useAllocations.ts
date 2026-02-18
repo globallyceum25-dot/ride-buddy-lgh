@@ -292,6 +292,46 @@ export function useCreateAllocation() {
         .update({ status: 'allocated' })
         .eq('id', allocation.request_id);
       
+      // Fire-and-forget: send notification to requester
+      (async () => {
+        try {
+          // Fetch request details, vehicle info, and driver name
+          const [requestRes, vehicleRes, driverRes] = await Promise.all([
+            supabase.from('travel_requests').select('request_number, pickup_location, dropoff_location, pickup_datetime, requester_id').eq('id', allocation.request_id).single(),
+            allocation.vehicle_id ? supabase.from('vehicles').select('registration_number, make, model').eq('id', allocation.vehicle_id).single() : Promise.resolve({ data: null }),
+            allocation.driver_id ? supabase.from('drivers').select('user_id').eq('id', allocation.driver_id).single() : Promise.resolve({ data: null }),
+          ]);
+          
+          const request = requestRes.data;
+          const vehicle = vehicleRes.data;
+          let driverName = "N/A";
+          
+          if (driverRes.data?.user_id) {
+            const { data: driverProfile } = await supabase.from('profiles').select('full_name').eq('user_id', driverRes.data.user_id).single();
+            driverName = driverProfile?.full_name || "N/A";
+          }
+          
+          if (request) {
+            const vehicleInfo = vehicle ? `${vehicle.registration_number} (${[vehicle.make, vehicle.model].filter(Boolean).join(' ')})` : "N/A";
+            await supabase.functions.invoke('send-notification', {
+              body: {
+                recipientUserId: request.requester_id,
+                type: 'allocation_assigned',
+                details: {
+                  requestNumber: request.request_number || 'N/A',
+                  route: `${request.pickup_location} → ${request.dropoff_location}`,
+                  vehicleInfo,
+                  driverName,
+                  pickupDatetime: request.pickup_datetime,
+                },
+              },
+            });
+          }
+        } catch (e) {
+          console.error('Failed to send allocation notification:', e);
+        }
+      })();
+      
       return data;
     },
     onSuccess: () => {
@@ -366,6 +406,49 @@ export function useCreateTripPool() {
         .from('travel_requests')
         .update({ status: 'allocated' })
         .in('id', request_ids);
+      
+      // Fire-and-forget: send notifications to all requesters in the pool
+      (async () => {
+        try {
+          const { data: poolRequests } = await supabase
+            .from('travel_requests')
+            .select('id, request_number, pickup_location, dropoff_location, pickup_datetime, requester_id')
+            .in('id', request_ids);
+          
+          let vehicleInfo = "N/A";
+          if (poolInsert.vehicle_id) {
+            const { data: vehicle } = await supabase.from('vehicles').select('registration_number, make, model').eq('id', poolInsert.vehicle_id).single();
+            if (vehicle) vehicleInfo = `${vehicle.registration_number} (${[vehicle.make, vehicle.model].filter(Boolean).join(' ')})`;
+          }
+          
+          let driverName = "N/A";
+          if (poolInsert.driver_id) {
+            const { data: driver } = await supabase.from('drivers').select('user_id').eq('id', poolInsert.driver_id).single();
+            if (driver?.user_id) {
+              const { data: driverProfile } = await supabase.from('profiles').select('full_name').eq('user_id', driver.user_id).single();
+              driverName = driverProfile?.full_name || "N/A";
+            }
+          }
+          
+          for (const req of poolRequests || []) {
+            supabase.functions.invoke('send-notification', {
+              body: {
+                recipientUserId: req.requester_id,
+                type: 'allocation_assigned',
+                details: {
+                  requestNumber: req.request_number || 'N/A',
+                  route: `${req.pickup_location} → ${req.dropoff_location}`,
+                  vehicleInfo,
+                  driverName,
+                  pickupDatetime: req.pickup_datetime,
+                },
+              },
+            }).catch(e => console.error('Pool notification failed:', e));
+          }
+        } catch (e) {
+          console.error('Failed to send pool allocation notifications:', e);
+        }
+      })();
       
       return pool;
     },
