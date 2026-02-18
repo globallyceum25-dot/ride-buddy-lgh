@@ -41,6 +41,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
 import { AllocationStatusBadge } from '@/components/allocations/AllocationStatusBadge';
 import { AllocationDialog } from '@/components/allocations/AllocationDialog';
+import { CloseRequestDialog } from '@/components/allocations/CloseRequestDialog';
 import { MergeRequestsDialog } from '@/components/allocations/MergeRequestsDialog';
 import { TripTrackingDialog } from '@/components/allocations/TripTrackingDialog';
 import { RouteDisplay } from '@/components/allocations/RouteDisplay';
@@ -65,6 +66,7 @@ export default function Allocations() {
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [trackingAllocation, setTrackingAllocation] = useState<Allocation | null>(null);
   const [trackingMode, setTrackingMode] = useState<'start' | 'complete'>('start');
+  const [closeDialogRequest, setCloseDialogRequest] = useState<any>(null);
 
   const { data: pendingRequests = [], isLoading: loadingPending } = usePendingAllocation();
   const { data: allocations = [], isLoading: loadingAllocations } = useAllocations();
@@ -319,24 +321,36 @@ export default function Allocations() {
                             <RequestPriorityBadge priority={request.priority} />
                           </TableCell>
                           <TableCell className="text-right">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => setAssignDialogRequest(request)}
-                                    disabled={isOverdue}
-                                  >
-                                    Assign
-                                  </Button>
-                                </span>
-                              </TooltipTrigger>
+                            <div className="flex items-center justify-end gap-2">
                               {isOverdue && (
-                                <TooltipContent>
-                                  <p>Pickup date has passed. Update the request date before allocating.</p>
-                                </TooltipContent>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => setCloseDialogRequest(request)}
+                                >
+                                  <X className="h-3.5 w-3.5 mr-1" />
+                                  Close
+                                </Button>
                               )}
-                            </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => setAssignDialogRequest(request)}
+                                      disabled={isOverdue}
+                                    >
+                                      Assign
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                {isOverdue && (
+                                  <TooltipContent>
+                                    <p>Pickup date has passed. Update the request date before allocating.</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
+                            </div>
                           </TableCell>
                         </TableRow>
                         );
@@ -622,6 +636,13 @@ export default function Allocations() {
             onSuccess: () => setTrackingAllocation(null),
           });
         }}
+      />
+
+      {/* Close Overdue Request Dialog */}
+      <CloseRequestDialog
+        request={closeDialogRequest}
+        open={!!closeDialogRequest}
+        onOpenChange={(open) => !open && setCloseDialogRequest(null)}
       />
     </DashboardLayout>
   );
