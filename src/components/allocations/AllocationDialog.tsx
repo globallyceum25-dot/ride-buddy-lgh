@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { Calendar, Car, User } from 'lucide-react';
+import { format, isPast } from 'date-fns';
+import { AlertTriangle, Calendar, Car, User } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -129,6 +130,8 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
   };
   
   if (!request) return null;
+
+  const isOverdue = isPast(new Date(request.pickup_datetime));
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -141,6 +144,14 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
         </DialogHeader>
         
         <div className="space-y-4 py-4">
+          {isOverdue && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                This request's pickup date has passed. Please update the request date before allocating.
+              </AlertDescription>
+            </Alert>
+          )}
           {/* Request Summary */}
           <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
             <div className="flex items-center gap-2 text-sm">
@@ -287,7 +298,7 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
           </Button>
           <Button 
             onClick={handleSubmit}
-            disabled={!vehicleId || !driverId || createAllocation.isPending}
+            disabled={!vehicleId || !driverId || createAllocation.isPending || isOverdue}
           >
             {createAllocation.isPending ? 'Assigning...' : 'Assign'}
           </Button>
