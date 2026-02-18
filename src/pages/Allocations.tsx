@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format } from 'date-fns';
+import { format, isPast } from 'date-fns';
 import { 
   Clock, 
   Car, 
@@ -11,7 +11,8 @@ import {
   Merge,
   Play,
   X,
-  Gauge
+  Gauge,
+  AlertTriangle
 } from 'lucide-react';
 import {
   Tooltip,
@@ -245,13 +246,27 @@ export default function Allocations() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {pendingRequests.map((request) => (
-                        <TableRow key={request.id}>
+                      {pendingRequests.map((request) => {
+                        const isOverdue = isPast(new Date(request.pickup_datetime));
+                        return (
+                        <TableRow key={request.id} className={isOverdue ? 'opacity-75' : ''}>
                           <TableCell>
-                            <Checkbox
-                              checked={selectedRequests.includes(request.id)}
-                              onCheckedChange={() => toggleRequestSelection(request.id)}
-                            />
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Checkbox
+                                    checked={selectedRequests.includes(request.id)}
+                                    onCheckedChange={() => toggleRequestSelection(request.id)}
+                                    disabled={isOverdue}
+                                  />
+                                </span>
+                              </TooltipTrigger>
+                              {isOverdue && (
+                                <TooltipContent>
+                                  <p>Cannot merge: pickup date has passed</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
                           </TableCell>
                           <TableCell className="font-medium">
                             {request.request_number}
@@ -283,26 +298,49 @@ export default function Allocations() {
                             />
                           </TableCell>
                           <TableCell>
-                            {format(new Date(request.pickup_datetime), 'MMM d, yyyy')}
-                            <br />
-                            <span className="text-muted-foreground text-xs">
-                              {format(new Date(request.pickup_datetime), 'h:mm a')}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <div>
+                                {format(new Date(request.pickup_datetime), 'MMM d, yyyy')}
+                                <br />
+                                <span className="text-muted-foreground text-xs">
+                                  {format(new Date(request.pickup_datetime), 'h:mm a')}
+                                </span>
+                              </div>
+                              {isOverdue && (
+                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 gap-1">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Overdue
+                                </Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>{request.passenger_count}</TableCell>
                           <TableCell>
                             <RequestPriorityBadge priority={request.priority} />
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              size="sm"
-                              onClick={() => setAssignDialogRequest(request)}
-                            >
-                              Assign
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setAssignDialogRequest(request)}
+                                    disabled={isOverdue}
+                                  >
+                                    Assign
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              {isOverdue && (
+                                <TooltipContent>
+                                  <p>Pickup date has passed. Update the request date before allocating.</p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
