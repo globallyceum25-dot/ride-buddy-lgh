@@ -561,6 +561,51 @@ export function useApproveRequest() {
   });
 }
 
+// Close overdue request (admin)
+export function useCloseRequest() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ id, reason, fromStatus }: { id: string; reason: string; fromStatus: RequestStatus }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('travel_requests')
+        .update({ status: 'cancelled' as RequestStatus })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await supabase.from('request_history').insert({
+        request_id: id,
+        action: 'Request closed (overdue)',
+        from_status: fromStatus,
+        to_status: 'cancelled' as RequestStatus,
+        performed_by: user.id,
+        notes: reason,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-allocation'] });
+      queryClient.invalidateQueries({ queryKey: ['my-requests'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-approvals'] });
+      toast({
+        title: 'Request Closed',
+        description: 'The overdue request has been closed.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 // Reject request
 export function useRejectRequest() {
   const queryClient = useQueryClient();
