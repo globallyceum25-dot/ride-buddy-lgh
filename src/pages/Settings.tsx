@@ -1,11 +1,12 @@
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings as SettingsIcon, Building2, Wallet, ScrollText, Link } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, Wallet, ScrollText, Link, MessageCircle } from 'lucide-react';
 import { GeneralSettings } from '@/components/settings/GeneralSettings';
 import { DepartmentSettings } from '@/components/settings/DepartmentSettings';
 import { CostCenterSettings } from '@/components/settings/CostCenterSettings';
 import { AuditLogs } from '@/components/settings/AuditLogs';
 import { PublicFormLinks } from '@/components/settings/PublicFormLinks';
+import { TelegramLinkSection } from '@/components/settings/TelegramLinkSection';
 
 export default function Settings() {
   return (
@@ -36,6 +37,10 @@ export default function Settings() {
               <Link className="h-4 w-4" />
               Form Links
             </TabsTrigger>
+            <TabsTrigger value="telegram" className="gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Telegram
+            </TabsTrigger>
             <TabsTrigger value="audit" className="gap-2">
               <ScrollText className="h-4 w-4" />
               Audit Logs
@@ -56,6 +61,10 @@ export default function Settings() {
 
           <TabsContent value="form-links">
             <PublicFormLinks />
+          </TabsContent>
+
+          <TabsContent value="telegram">
+            <TelegramLinkSection />
           </TabsContent>
 
           <TabsContent value="audit">
