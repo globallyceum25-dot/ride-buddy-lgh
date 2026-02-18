@@ -606,6 +606,63 @@ export function useCloseRequest() {
   });
 }
 
+// Reschedule overdue request
+export function useRescheduleRequest() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      pickupDatetime,
+      returnDatetime,
+      oldPickupDatetime,
+    }: {
+      id: string;
+      pickupDatetime: string;
+      returnDatetime?: string;
+      oldPickupDatetime: string;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const updateData: Record<string, string> = { pickup_datetime: pickupDatetime };
+      if (returnDatetime) {
+        updateData.return_datetime = returnDatetime;
+      }
+
+      const { error } = await supabase
+        .from('travel_requests')
+        .update(updateData)
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await supabase.from('request_history').insert({
+        request_id: id,
+        action: 'Request rescheduled',
+        performed_by: user.id,
+        notes: `Pickup changed from ${oldPickupDatetime} to ${pickupDatetime}`,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-allocation'] });
+      queryClient.invalidateQueries({ queryKey: ['my-requests'] });
+      toast({
+        title: 'Request Rescheduled',
+        description: 'The pickup date has been updated.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 // Reject request
 export function useRejectRequest() {
   const queryClient = useQueryClient();

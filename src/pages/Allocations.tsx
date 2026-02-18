@@ -42,6 +42,7 @@ import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge
 import { AllocationStatusBadge } from '@/components/allocations/AllocationStatusBadge';
 import { AllocationDialog } from '@/components/allocations/AllocationDialog';
 import { CloseRequestDialog } from '@/components/allocations/CloseRequestDialog';
+import { RescheduleRequestDialog } from '@/components/allocations/RescheduleRequestDialog';
 import { MergeRequestsDialog } from '@/components/allocations/MergeRequestsDialog';
 import { TripTrackingDialog } from '@/components/allocations/TripTrackingDialog';
 import { RouteDisplay } from '@/components/allocations/RouteDisplay';
@@ -67,6 +68,7 @@ export default function Allocations() {
   const [trackingAllocation, setTrackingAllocation] = useState<Allocation | null>(null);
   const [trackingMode, setTrackingMode] = useState<'start' | 'complete'>('start');
   const [closeDialogRequest, setCloseDialogRequest] = useState<any>(null);
+  const [rescheduleDialogRequest, setRescheduleDialogRequest] = useState<any>(null);
 
   const { data: pendingRequests = [], isLoading: loadingPending } = usePendingAllocation();
   const { data: allocations = [], isLoading: loadingAllocations } = useAllocations();
@@ -323,14 +325,24 @@ export default function Allocations() {
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
                               {isOverdue && (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => setCloseDialogRequest(request)}
-                                >
-                                  <X className="h-3.5 w-3.5 mr-1" />
-                                  Close
-                                </Button>
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setRescheduleDialogRequest(request)}
+                                  >
+                                    <Calendar className="h-3.5 w-3.5 mr-1" />
+                                    Reschedule
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setCloseDialogRequest(request)}
+                                  >
+                                    <X className="h-3.5 w-3.5 mr-1" />
+                                    Close
+                                  </Button>
+                                </>
                               )}
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -643,6 +655,13 @@ export default function Allocations() {
         request={closeDialogRequest}
         open={!!closeDialogRequest}
         onOpenChange={(open) => !open && setCloseDialogRequest(null)}
+      />
+
+      {/* Reschedule Overdue Request Dialog */}
+      <RescheduleRequestDialog
+        request={rescheduleDialogRequest}
+        open={!!rescheduleDialogRequest}
+        onOpenChange={(open) => !open && setRescheduleDialogRequest(null)}
       />
     </DashboardLayout>
   );
