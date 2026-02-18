@@ -571,6 +571,13 @@ export function useCloseRequest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Fetch request details for notification before closing
+      const { data: request } = await supabase
+        .from('travel_requests')
+        .select('requester_id, request_number, pickup_location, dropoff_location')
+        .eq('id', id)
+        .single();
+
       const { error } = await supabase
         .from('travel_requests')
         .update({ status: 'cancelled' as RequestStatus })
@@ -586,6 +593,21 @@ export function useCloseRequest() {
         performed_by: user.id,
         notes: reason,
       });
+
+      // Fire-and-forget notification
+      if (request) {
+        supabase.functions.invoke('send-notification', {
+          body: {
+            recipientUserId: request.requester_id,
+            type: 'overdue_closed',
+            details: {
+              requestNumber: request.request_number || id,
+              route: `${request.pickup_location} → ${request.dropoff_location}`,
+              reason,
+            },
+          },
+        }).catch(console.warn);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-allocation'] });
@@ -626,6 +648,13 @@ export function useRescheduleRequest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
+      // Fetch request details for notification
+      const { data: request } = await supabase
+        .from('travel_requests')
+        .select('requester_id, request_number, pickup_location, dropoff_location')
+        .eq('id', id)
+        .single();
+
       const updateData: Record<string, string> = { pickup_datetime: pickupDatetime };
       if (returnDatetime) {
         updateData.return_datetime = returnDatetime;
@@ -644,6 +673,21 @@ export function useRescheduleRequest() {
         performed_by: user.id,
         notes: `Pickup changed from ${oldPickupDatetime} to ${pickupDatetime}`,
       });
+
+      // Fire-and-forget notification
+      if (request) {
+        supabase.functions.invoke('send-notification', {
+          body: {
+            recipientUserId: request.requester_id,
+            type: 'overdue_rescheduled',
+            details: {
+              requestNumber: request.request_number || id,
+              route: `${request.pickup_location} → ${request.dropoff_location}`,
+              newPickupDate: pickupDatetime,
+            },
+          },
+        }).catch(console.warn);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-allocation'] });
