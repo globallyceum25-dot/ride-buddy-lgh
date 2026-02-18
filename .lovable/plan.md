@@ -1,66 +1,23 @@
 
 
-# Set Up Telegram Webhook
+# Update Resend Sender Email to Verified Domain
 
-## What needs to happen
+## Summary
 
-The Telegram Bot API needs to be told where to send incoming messages. This is done by calling the `setWebhook` endpoint once with the URL of our `telegram-webhook` edge function.
+Change the sender email in the `send-notification` edge function from the Resend test address to your verified production domain.
 
-## Approach
+## Change
 
-Create a small one-time-use edge function called `setup-telegram-webhook` that:
+**File:** `supabase/functions/send-notification/index.ts`
 
-1. Reads the `TELEGRAM_BOT_TOKEN` from Supabase secrets
-2. Calls `https://api.telegram.org/bot<TOKEN>/setWebhook` with the URL set to `https://jqnxbckdxvfkjyhrfthp.supabase.co/functions/v1/telegram-webhook`
-3. Returns the Telegram API response so we can confirm it worked
+**Line 100** -- update the `from` field:
 
-After calling it once to register the webhook, we can delete the function since it's no longer needed.
+- **Before:** `"Travel System <onboarding@resend.dev>"`
+- **After:** `"Travel System <noreply@lyceumglobal.co>"`
 
-## Technical Details
+This is a single-line change. No other files need to be modified.
 
-### New file: `supabase/functions/setup-telegram-webhook/index.ts`
+## Prerequisite
 
-```typescript
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
-  const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN")!;
-  const WEBHOOK_URL = `${Deno.env.get("SUPABASE_URL")!}/functions/v1/telegram-webhook`;
-
-  const res = await fetch(
-    `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url: WEBHOOK_URL }),
-    }
-  );
-
-  const data = await res.json();
-
-  return new Response(JSON.stringify(data), {
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-});
-```
-
-### Modify: `supabase/config.toml`
-
-Add entry for the new function with `verify_jwt = false`.
-
-### Steps after deployment
-
-1. Deploy the function
-2. Call it once via the edge function curl tool
-3. Confirm Telegram returns `{"ok": true, "result": true}`
-4. Delete the function since it's no longer needed
+Make sure the domain `lyceumglobal.co` is fully verified in your [Resend dashboard](https://resend.com/domains). The current logs show a 403 error because the test domain can only send to your own email -- this change will resolve that.
 
