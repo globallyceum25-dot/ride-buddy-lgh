@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "Travel System <onboarding@resend.dev>",
+            from: "Travel System <noreply@lyceumglobal.co>",
             to: profile.email,
             subject,
             html: emailHtml,
