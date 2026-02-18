@@ -1,70 +1,136 @@
 
 
-# Reschedule Overdue Requests from Allocations Page
+# Telegram and Email Notifications for Overdue Request Actions
 
 ## Overview
 
-Add a "Reschedule" button for overdue requests in the Allocations page, allowing coordinators to update the pickup date/time without closing the request.
+When an admin closes or reschedules an overdue travel request, the system will notify the requester via both Telegram (direct message) and email (via Resend). This requires storing Telegram chat IDs for users, creating a new edge function to send notifications, and wiring the close/reschedule mutations to trigger it.
+
+## Prerequisites
+
+Two API keys are needed before implementation:
+1. **Telegram Bot Token** -- create a bot via [@BotFather](https://t.me/BotFather) on Telegram and copy the token
+2. **Resend API Key** -- sign up at [resend.com](https://resend.com), verify a sending domain, and copy the API key
+
+These will be stored as Supabase secrets (`TELEGRAM_BOT_TOKEN`, `RESEND_API_KEY`).
 
 ## Changes
 
-### 1. New Component: `RescheduleRequestDialog.tsx`
+### 1. Database Migration
 
-A dialog containing:
-- The request number and route summary for context
-- A date picker (using Shadcn Popover + Calendar) for the new pickup date
-- A time input for the new pickup time
-- Optional: update return date/time if the request has one
-- Cancel and "Reschedule" (primary) buttons
+Add a `telegram_chat_id` column to the `profiles` table so each user can link their Telegram account:
 
-### 2. New Mutation: `useRescheduleRequest` (in `useRequests.ts`)
-
-A mutation that:
-- Updates `travel_requests.pickup_datetime` (and optionally `return_datetime`) for the given request ID
-- Inserts a `request_history` record with action "Request rescheduled", noting the old and new dates
-- Invalidates `pending-allocation` and `my-requests` query caches
-
-No schema migration needed -- we are updating existing columns.
-
-### 3. Update Allocations Page (`Allocations.tsx`)
-
-- Add a "Reschedule" button (outline variant, with Calendar icon) next to the "Close" button for overdue requests
-- Wire it to open the `RescheduleRequestDialog`
-- After successful reschedule, the request's date updates and it becomes allocatable again
-
-### Visual Layout for Overdue Rows
-
-```text
-| TR-2026-0042 | John | HQ -> Airport | Feb 15 [OVERDUE] | 3 | Normal | [Reschedule] [Close] [Assign-disabled] |
+```sql
+ALTER TABLE profiles ADD COLUMN telegram_chat_id text;
 ```
+
+### 2. New Edge Function: `send-notification`
+
+A single edge function that accepts a notification payload and sends it via both channels.
+
+**Input:**
+```json
+{
+  "requestId": "uuid",
+  "recipientUserId": "uuid",
+  "type": "overdue_closed" | "overdue_rescheduled",
+  "details": {
+    "requestNumber": "TR-2026-0042",
+    "route": "HQ -> Airport",
+    "reason": "Pickup date passed",
+    "newPickupDate": "2026-03-01T09:00:00Z"
+  }
+}
+```
+
+**Logic:**
+- Fetch the recipient's profile (email, full_name, telegram_chat_id)
+- Send email via Resend API with a formatted HTML message
+- If `telegram_chat_id` exists, send a Telegram message via Bot API
+- Return success/failure for each channel
+
+### 3. Update `useCloseRequest` and `useRescheduleRequest` Hooks
+
+After the database updates succeed, call the `send-notification` edge function with the appropriate type and details. The notification is fire-and-forget (non-blocking) -- if it fails, the close/reschedule still succeeds and a console warning is logged.
+
+### 4. Telegram Bot Linking (User Settings)
+
+Add a simple flow in user settings or profile to link a Telegram account:
+- Display a "Link Telegram" button that shows instructions: "Send /start to our bot @YourBotName"
+- Create a small edge function or webhook (`telegram-webhook`) that listens for `/start` messages and maps the Telegram chat ID to the user (via a one-time linking code)
 
 ## Files to Create/Modify
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/allocations/RescheduleRequestDialog.tsx` | Create | Dialog with date/time picker for new pickup |
-| `src/hooks/useRequests.ts` | Modify | Add `useRescheduleRequest` mutation |
-| `src/pages/Allocations.tsx` | Modify | Add Reschedule button for overdue requests, wire dialog |
+| Migration SQL | Create | Add `telegram_chat_id` to `profiles` |
+| `supabase/functions/send-notification/index.ts` | Create | Edge function to send Telegram + Resend notifications |
+| `supabase/functions/telegram-webhook/index.ts` | Create | Webhook to handle Telegram bot /start and link chat IDs |
+| `supabase/config.toml` | Modify | Add config for new edge functions |
+| `src/hooks/useRequests.ts` | Modify | Call `send-notification` after close/reschedule |
+| `src/components/settings/TelegramLinkSection.tsx` | Create | UI for users to link their Telegram account |
+| `src/pages/Settings.tsx` | Modify | Include TelegramLinkSection in settings page |
 
 ## Technical Details
 
-**useRescheduleRequest mutation:**
+### send-notification Edge Function
+
 ```typescript
-mutationFn: async ({ id, pickupDatetime, returnDatetime }) => {
-  const { data: oldRequest } = await supabase
-    .from('travel_requests').select('pickup_datetime, status').eq('id', id).single();
+// Resend email
+await fetch('https://api.resend.com/emails', {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${RESEND_API_KEY}` },
+  body: JSON.stringify({
+    from: 'notifications@yourdomain.com',
+    to: recipientEmail,
+    subject: `Travel Request ${requestNumber} - ${actionLabel}`,
+    html: emailTemplate,
+  }),
+});
 
-  await supabase.from('travel_requests')
-    .update({ pickup_datetime: pickupDatetime, return_datetime: returnDatetime })
-    .eq('id', id);
-
-  await supabase.from('request_history').insert({
-    request_id: id,
-    action: 'Request rescheduled',
-    notes: `Pickup changed from ${oldRequest.pickup_datetime} to ${pickupDatetime}`,
+// Telegram message
+if (telegramChatId) {
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: telegramChatId,
+      text: telegramMessage,
+      parse_mode: 'HTML',
+    }),
   });
 }
 ```
 
-**RescheduleRequestDialog** validates that the new date is in the future before allowing submission.
+### Telegram Linking Flow
+
+1. User clicks "Link Telegram" in Settings
+2. System generates a unique 6-character code, stores it temporarily (in `profiles.telegram_link_code` or a short-lived entry)
+3. User sends `/start CODE` to the bot on Telegram
+4. The `telegram-webhook` edge function receives the message, looks up the code, and saves the `chat_id` to the user's profile
+5. UI confirms linking is complete
+
+### Hook Integration (fire-and-forget)
+
+```typescript
+// In useCloseRequest, after successful DB update:
+supabase.functions.invoke('send-notification', {
+  body: {
+    requestId: id,
+    recipientUserId: request.requester_id,
+    type: 'overdue_closed',
+    details: { requestNumber, route, reason },
+  },
+}).catch(console.warn);
+```
+
+### Notification Messages
+
+**Closed (Email subject):** "Travel Request TR-2026-0042 Closed"
+**Closed (Body):** "Your travel request TR-2026-0042 (HQ to Airport) has been closed because the pickup date has passed. Reason: [admin's reason]."
+
+**Rescheduled (Email subject):** "Travel Request TR-2026-0042 Rescheduled"
+**Rescheduled (Body):** "Your travel request TR-2026-0042 (HQ to Airport) has been rescheduled. New pickup: March 1, 2026 at 9:00 AM."
+
+Telegram messages will use the same content in a concise text format with HTML formatting.
 
