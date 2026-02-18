@@ -1,58 +1,71 @@
 
-
-# Prevent Allocation for Past-Date Requests
+# Admin Close Overdue Requests
 
 ## Overview
 
-Add validation to prevent coordinators from assigning vehicles and drivers to travel requests whose pickup date has already passed. Past-date requests will be visually flagged in the pending list and the "Assign" button will be disabled with a clear explanation.
+Add a "Close" action for admins on overdue pending requests in the Allocations page. When clicked, a dialog prompts for a closure reason, then sets the request status to `cancelled` with the reason logged in request history.
 
 ## Changes
 
-### 1. Allocations Page - Pending Requests Table (`src/pages/Allocations.tsx`)
+### 1. New Component: `CloseRequestDialog.tsx`
 
-- Add a past-date check for each pending request: `isPast = new Date(request.pickup_datetime) < new Date()`
-- Show a visual warning indicator (amber/red badge or row highlight) for past-date requests
-- Disable the "Assign" button for past-date requests with a tooltip explaining why
-- Optionally disable the checkbox for merging past-date requests too
+A simple dialog with:
+- Warning header explaining the request is overdue
+- Request number and route summary displayed
+- Required textarea for closure reason
+- Cancel and "Close Request" (destructive) buttons
+
+### 2. New Hook: `useCloseRequest` (in `useRequests.ts`)
+
+A mutation that:
+- Updates `travel_requests.status` to `cancelled`
+- Inserts a `request_history` record with action "Request closed (overdue)", from_status, to_status `cancelled`, and the reason in `notes`
+- Invalidates relevant query caches (`pending-allocation`, `my-requests`)
+
+No schema migration needed -- the `cancelled` status already exists and `request_history.notes` stores the reason.
+
+### 3. Update Allocations Page (`Allocations.tsx`)
+
+- Add a "Close" button (destructive variant) next to the disabled "Assign" button for overdue requests
+- Wire it to open the `CloseRequestDialog`
+- On successful close, the request disappears from the pending list
+
+### Visual Layout for Overdue Rows
 
 ```text
-Before:
-| REQ-001 | John | HQ -> Airport | Feb 15 (past) | [Assign] |
-
-After:
-| REQ-001 | John | HQ -> Airport | Feb 15 [OVERDUE] | [Assign - disabled] |
-                                                        "Cannot allocate:
-                                                         pickup date has passed"
+| TR-2026-0042 | John | HQ -> Airport | Feb 15 [OVERDUE] | 3 | Normal | [Close] [Assign-disabled] |
 ```
 
-### 2. Allocation Dialog (`src/components/allocations/AllocationDialog.tsx`)
+### Files to Create/Modify
 
-- Add a secondary guard: if the dialog somehow opens for a past-date request, show an alert banner at the top and disable the submit button
-- Display a warning message: "This request's pickup date has passed. Please update the request date before allocating."
-
-### Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/pages/Allocations.tsx` | Add `isPastDate` check, disable Assign button, show "Overdue" badge, disable merge checkbox for past requests |
-| `src/components/allocations/AllocationDialog.tsx` | Add past-date guard with warning banner and disabled submit |
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/allocations/CloseRequestDialog.tsx` | Create | Dialog with reason textarea |
+| `src/hooks/useRequests.ts` | Modify | Add `useCloseRequest` mutation |
+| `src/pages/Allocations.tsx` | Modify | Add Close button for overdue requests, wire dialog |
 
 ### Technical Details
 
-**Past-date detection logic:**
+**useCloseRequest mutation:**
 ```typescript
-const isPastDate = (pickupDatetime: string) => {
-  return new Date(pickupDatetime) < new Date();
-};
+export function useCloseRequest() {
+  return useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      // Update status to cancelled
+      await supabase.from('travel_requests')
+        .update({ status: 'cancelled' }).eq('id', id);
+      // Log with reason
+      await supabase.from('request_history').insert({
+        request_id: id,
+        action: 'Request closed (overdue)',
+        from_status: 'approved',
+        to_status: 'cancelled',
+        performed_by: user.id,
+        notes: reason,
+      });
+    },
+  });
+}
 ```
 
-**In the pending table row** (Allocations.tsx):
-- Date cell gets an "Overdue" badge in destructive color when past
-- Assign button becomes disabled with a tooltip: "Pickup date has passed"
-- Checkbox for merge selection is also disabled for past-date requests
-
-**In AllocationDialog** (safety net):
-- Check `request.pickup_datetime` against current time
-- If past, render an `Alert` with destructive variant at the top of the dialog
-- Disable the "Assign" submit button
-
+**CloseRequestDialog** accepts: `request` object, `open` boolean, `onOpenChange`, and calls the mutation on submit.
