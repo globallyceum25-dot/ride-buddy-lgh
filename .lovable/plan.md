@@ -1,54 +1,54 @@
 
 
-# Add Notifications for Dispatched and In-Progress Status Changes
+# Send Approval Request Notifications to Approvers via Telegram and Email
 
 ## Overview
-When a trip status changes to "dispatched" or "in_progress", send a notification to the requester via both Telegram and email, informing them of the status update with relevant trip details.
+When a travel request is submitted (status set to `pending_approval`), notify the assigned approver via both Telegram and email so they can take action promptly.
 
 ## Changes
 
 ### 1. Update the `send-notification` edge function
 **File:** `supabase/functions/send-notification/index.ts`
 
-- Add two new notification types to the `NotificationPayload` type: `"trip_dispatched"` and `"trip_in_progress"`
-- Build appropriate messages for each:
-  - **Dispatched:** "Your travel request TR-XXXX-XXXX has been dispatched. Vehicle ABC-1234 and driver John Doe are on their way. Pickup: Feb 20, 2026 at 9:00 AM."
-  - **In Progress:** "Your travel request TR-XXXX-XXXX trip is now in progress."
-- Reuse existing email HTML template and Telegram formatting patterns
+- Add a new notification type: `"approval_requested"`
+- Build message templates:
+  - **Email subject:** "Travel Request TR-XXXX-XXXX - Approval Required"
+  - **Email body:** "A new travel request TR-XXXX-XXXX requires your approval. Route: Location A to Location B. Requester: Jane Smith. Pickup: Feb 20, 2026 at 9:00 AM. Purpose: [purpose text]."
+  - **Telegram:** Same content with HTML bold formatting and a clipboard emoji
+- Add new optional detail fields: `requesterName` and `purpose`
 
-### 2. Add notification calls in `useUpdateAllocationStatus`
-**File:** `src/hooks/useAllocations.ts`
+### 2. Trigger notification in `useCreateRequest`
+**File:** `src/hooks/useRequests.ts`
 
-- After successfully updating status to `dispatched` or `in_progress`, fire-and-forget a notification call
-- Fetch the request details (request_number, route, requester_id, pickup_datetime), vehicle info, and driver name from the allocation data
-- Call `supabase.functions.invoke('send-notification')` with the appropriate type
+- After the request is created and the history entry is logged (around line 415), add a fire-and-forget notification call
+- The request already has `approver_id`, `request_number`, route info, and `pickup_datetime` available from the insert response
+- Fetch the requester's name from the current user's profile
+- Call `supabase.functions.invoke('send-notification')` with:
+  - `recipientUserId`: the `approver_id`
+  - `type`: `"approval_requested"`
+  - `details`: request number, route, pickup datetime, requester name, purpose
 
-### 3. Add notification calls in `useBulkUpdateAllocationStatus`
-**File:** `src/hooks/useAllocations.ts`
+### 3. Trigger notification in `submit-public-request` edge function
+**File:** `supabase/functions/submit-public-request/index.ts`
 
-- Same logic as above but for pooled trips -- send a notification to each requester in the pool when bulk status changes to dispatched or in_progress
+- After the public request is created, send the same `approval_requested` notification to the `default_approver_id`
+- Use the guest name as the requester name
 
 ## Technical Details
 
-**New payload types:**
+**New payload type:**
 ```text
-type: "trip_dispatched" | "trip_in_progress"
+type: "approval_requested"
 details: {
   requestNumber: string
   route: string
-  vehicleInfo: string   (for dispatched)
-  driverName: string    (for dispatched)
-  pickupDatetime: string (for dispatched)
+  pickupDatetime: string
+  requesterName: string
+  purpose: string
 }
 ```
 
-**Edge function templates:**
+**No database changes needed.** All required data is already available at the point of request creation.
 
-Dispatched email subject: "Travel Request TR-XXXX - Trip Dispatched"
-Dispatched body: Vehicle and driver details with pickup time, informing requester the vehicle is on its way.
-
-In-progress email subject: "Travel Request TR-XXXX - Trip In Progress"
-In-progress body: Simple confirmation that the trip has started.
-
-**No database changes needed.** All required data (profiles, vehicles, drivers) is already accessible.
+The notification calls are fire-and-forget so request creation is never blocked by notification failures.
 
