@@ -513,6 +513,51 @@ export function useUpdateAllocationStatus() {
           .eq('id', vehicle_id);
       }
       
+      // Fire-and-forget: send notification for dispatched/in_progress
+      if (data && (status === 'dispatched' || status === 'in_progress')) {
+        (async () => {
+          try {
+            const { data: allocation } = await supabase
+              .from('allocations')
+              .select(`
+                request:travel_requests(request_number, pickup_location, dropoff_location, pickup_datetime, requester_id),
+                vehicle:vehicles(registration_number, make, model),
+                driver:drivers(user_id)
+              `)
+              .eq('id', id)
+              .single();
+            
+            const request = allocation?.request;
+            if (!request) return;
+            
+            let driverName = "N/A";
+            if (allocation?.driver?.user_id) {
+              const { data: dp } = await supabase.from('profiles').select('full_name').eq('user_id', allocation.driver.user_id).single();
+              driverName = dp?.full_name || "N/A";
+            }
+            
+            const v = allocation?.vehicle;
+            const vehicleInfo = v ? `${v.registration_number} (${[v.make, v.model].filter(Boolean).join(' ')})` : "N/A";
+            
+            await supabase.functions.invoke('send-notification', {
+              body: {
+                recipientUserId: request.requester_id,
+                type: status === 'dispatched' ? 'trip_dispatched' : 'trip_in_progress',
+                details: {
+                  requestNumber: request.request_number || 'N/A',
+                  route: `${request.pickup_location} → ${request.dropoff_location}`,
+                  vehicleInfo,
+                  driverName,
+                  pickupDatetime: request.pickup_datetime,
+                },
+              },
+            });
+          } catch (e) {
+            console.error('Failed to send trip status notification:', e);
+          }
+        })();
+      }
+      
       return data;
     },
     onSuccess: () => {
@@ -579,6 +624,56 @@ export function useBulkUpdateAllocationStatus() {
           .from('vehicles')
           .update({ odometer: updates.odometer_end })
           .eq('id', vehicle_id);
+      }
+      
+      // Fire-and-forget: send notifications for dispatched/in_progress
+      if (data && (status === 'dispatched' || status === 'in_progress')) {
+        (async () => {
+          try {
+            const requestIds = data.map(a => a.request_id);
+            const { data: requests } = await supabase
+              .from('travel_requests')
+              .select('id, request_number, pickup_location, dropoff_location, pickup_datetime, requester_id')
+              .in('id', requestIds);
+            
+            // Fetch vehicle & driver info from first allocation
+            const { data: firstAlloc } = await supabase
+              .from('allocations')
+              .select('vehicle:vehicles(registration_number, make, model), driver:drivers(user_id)')
+              .eq('id', ids[0])
+              .single();
+            
+            let vehicleInfo = "N/A";
+            if (firstAlloc?.vehicle) {
+              const v = firstAlloc.vehicle;
+              vehicleInfo = `${v.registration_number} (${[v.make, v.model].filter(Boolean).join(' ')})`;
+            }
+            
+            let driverName = "N/A";
+            if (firstAlloc?.driver?.user_id) {
+              const { data: dp } = await supabase.from('profiles').select('full_name').eq('user_id', firstAlloc.driver.user_id).single();
+              driverName = dp?.full_name || "N/A";
+            }
+            
+            for (const req of requests || []) {
+              supabase.functions.invoke('send-notification', {
+                body: {
+                  recipientUserId: req.requester_id,
+                  type: status === 'dispatched' ? 'trip_dispatched' : 'trip_in_progress',
+                  details: {
+                    requestNumber: req.request_number || 'N/A',
+                    route: `${req.pickup_location} → ${req.dropoff_location}`,
+                    vehicleInfo,
+                    driverName,
+                    pickupDatetime: req.pickup_datetime,
+                  },
+                },
+              }).catch(e => console.error('Bulk trip notification failed:', e));
+            }
+          } catch (e) {
+            console.error('Failed to send bulk trip status notifications:', e);
+          }
+        })();
       }
       
       return data;
