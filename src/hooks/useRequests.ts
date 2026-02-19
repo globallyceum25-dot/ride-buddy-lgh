@@ -414,6 +414,35 @@ export function useCreateRequest() {
         performed_by: user.id,
       });
 
+      // Fire-and-forget: notify approver
+      if (request.approver_id) {
+        (async () => {
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('user_id', user.id)
+              .single();
+
+            await supabase.functions.invoke('send-notification', {
+              body: {
+                recipientUserId: request.approver_id,
+                type: 'approval_requested',
+                details: {
+                  requestNumber: request.request_number || 'N/A',
+                  route: `${request.pickup_location} → ${request.dropoff_location}`,
+                  pickupDatetime: request.pickup_datetime,
+                  requesterName: profile?.full_name || 'Unknown',
+                  purpose: request.purpose,
+                },
+              },
+            });
+          } catch (e) {
+            console.error('Failed to send approval notification:', e);
+          }
+        })();
+      }
+
       return request;
     },
     onSuccess: () => {

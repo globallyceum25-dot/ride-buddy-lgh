@@ -148,6 +148,36 @@ Deno.serve(async (req) => {
       notes: `Submitted by ${guestInfo.name} (${guestInfo.email}) via public form link "${formLink.name}"`,
     });
 
+    // Fire-and-forget: notify approver
+    if (formLink.default_approver_id) {
+      try {
+        const notifyRes = await fetch(
+          `${Deno.env.get('SUPABASE_URL')!}/functions/v1/send-notification`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')!}`,
+            },
+            body: JSON.stringify({
+              recipientUserId: formLink.default_approver_id,
+              type: 'approval_requested',
+              details: {
+                requestNumber: request.request_number || 'N/A',
+                route: `${requestData.pickup_location} → ${requestData.dropoff_location}`,
+                pickupDatetime: requestData.pickup_datetime,
+                requesterName: guestInfo.name,
+                purpose: requestData.purpose,
+              },
+            }),
+          }
+        );
+        console.log('Approval notification sent:', notifyRes.ok);
+      } catch (e) {
+        console.error('Failed to send approval notification:', e);
+      }
+    }
+
     console.log('Request submission completed successfully');
 
     return new Response(

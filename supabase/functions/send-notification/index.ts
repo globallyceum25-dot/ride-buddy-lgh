@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface NotificationPayload {
   recipientUserId: string;
-  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned" | "trip_dispatched" | "trip_in_progress";
+  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned" | "trip_dispatched" | "trip_in_progress" | "approval_requested";
   details: {
     requestNumber: string;
     route: string;
@@ -17,6 +17,8 @@ interface NotificationPayload {
     vehicleInfo?: string;
     driverName?: string;
     pickupDatetime?: string;
+    requesterName?: string;
+    purpose?: string;
   };
 }
 
@@ -86,6 +88,15 @@ Deno.serve(async (req) => {
     } else if (type === "trip_in_progress") {
       subject = `Travel Request ${details.requestNumber} - Trip In Progress`;
       bodyText = `Your travel request ${details.requestNumber} (${details.route}) is now in progress.`;
+    } else if (type === "approval_requested") {
+      subject = `Travel Request ${details.requestNumber} - Approval Required`;
+      const pickupStr = details.pickupDatetime
+        ? new Date(details.pickupDatetime).toLocaleString("en-US", {
+            dateStyle: "long",
+            timeStyle: "short",
+          })
+        : "TBD";
+      bodyText = `A new travel request ${details.requestNumber} requires your approval.\n\nRoute: ${details.route}\nRequester: ${details.requesterName || "N/A"}\nPickup: ${pickupStr}\nPurpose: ${details.purpose || "N/A"}`;
     } else {
       const isClose = type === "overdue_closed";
       const actionLabel = isClose ? "Closed" : "Rescheduled";
@@ -152,6 +163,9 @@ Deno.serve(async (req) => {
           telegramText = `<b>${emoji} ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Vehicle:</b> ${details.vehicleInfo || "N/A"}\n<b>Driver:</b> ${details.driverName || "N/A"}\n<b>Pickup:</b> ${pickupStr}`;
         } else if (type === "trip_in_progress") {
           telegramText = `<b>🏁 ${subject}</b>\n\n${bodyText}`;
+        } else if (type === "approval_requested") {
+          const pickupStr = details.pickupDatetime ? new Date(details.pickupDatetime).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" }) : "TBD";
+          telegramText = `<b>📋 ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Requester:</b> ${details.requesterName || "N/A"}\n<b>Pickup:</b> ${pickupStr}\n<b>Purpose:</b> ${details.purpose || "N/A"}`;
         } else {
           telegramText = `<b>🚗 ${subject}</b>\n\n${bodyText}`;
         }
