@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface NotificationPayload {
   recipientUserId: string;
-  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned";
+  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned" | "trip_dispatched" | "trip_in_progress";
   details: {
     requestNumber: string;
     route: string;
@@ -74,6 +74,18 @@ Deno.serve(async (req) => {
           })
         : "TBD";
       bodyText = `Your travel request ${details.requestNumber} (${details.route}) has been assigned.\n\nVehicle: ${details.vehicleInfo || "N/A"}\nDriver: ${details.driverName || "N/A"}\nPickup: ${pickupStr}`;
+    } else if (type === "trip_dispatched") {
+      subject = `Travel Request ${details.requestNumber} - Trip Dispatched`;
+      const pickupStr = details.pickupDatetime
+        ? new Date(details.pickupDatetime).toLocaleString("en-US", {
+            dateStyle: "long",
+            timeStyle: "short",
+          })
+        : "TBD";
+      bodyText = `Your travel request ${details.requestNumber} (${details.route}) has been dispatched. Vehicle ${details.vehicleInfo || "N/A"} and driver ${details.driverName || "N/A"} are on their way.\n\nPickup: ${pickupStr}`;
+    } else if (type === "trip_in_progress") {
+      subject = `Travel Request ${details.requestNumber} - Trip In Progress`;
+      bodyText = `Your travel request ${details.requestNumber} (${details.route}) is now in progress.`;
     } else {
       const isClose = type === "overdue_closed";
       const actionLabel = isClose ? "Closed" : "Rescheduled";
@@ -133,9 +145,16 @@ Deno.serve(async (req) => {
     const TELEGRAM_BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
     if (TELEGRAM_BOT_TOKEN && profile.telegram_chat_id) {
       try {
-        const telegramText = type === "allocation_assigned"
-          ? `<b>🚗 ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Vehicle:</b> ${details.vehicleInfo || "N/A"}\n<b>Driver:</b> ${details.driverName || "N/A"}\n<b>Pickup:</b> ${details.pickupDatetime ? new Date(details.pickupDatetime).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" }) : "TBD"}`
-          : `<b>🚗 ${subject}</b>\n\n${bodyText}`;
+      let telegramText: string;
+        if (type === "allocation_assigned" || type === "trip_dispatched") {
+          const pickupStr = details.pickupDatetime ? new Date(details.pickupDatetime).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" }) : "TBD";
+          const emoji = type === "allocation_assigned" ? "🚗" : "🚀";
+          telegramText = `<b>${emoji} ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Vehicle:</b> ${details.vehicleInfo || "N/A"}\n<b>Driver:</b> ${details.driverName || "N/A"}\n<b>Pickup:</b> ${pickupStr}`;
+        } else if (type === "trip_in_progress") {
+          telegramText = `<b>🏁 ${subject}</b>\n\n${bodyText}`;
+        } else {
+          telegramText = `<b>🚗 ${subject}</b>\n\n${bodyText}`;
+        }
         const tgRes = await fetch(
           `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
           {
