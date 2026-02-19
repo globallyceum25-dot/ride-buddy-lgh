@@ -1,52 +1,54 @@
 
 
-# Send Notification When Vehicle and Driver Are Assigned
+# Add Notifications for Dispatched and In-Progress Status Changes
 
 ## Overview
-When a coordinator assigns a vehicle and driver to a travel request (creates an allocation), the requester will receive a notification via both Telegram and email informing them of the assignment details.
+When a trip status changes to "dispatched" or "in_progress", send a notification to the requester via both Telegram and email, informing them of the status update with relevant trip details.
 
 ## Changes
 
 ### 1. Update the `send-notification` edge function
 **File:** `supabase/functions/send-notification/index.ts`
 
-- Add a new notification type `allocation_assigned` to the `NotificationPayload` interface
-- Add new detail fields: `vehicleInfo`, `driverName`, `pickupDatetime`
-- Build an appropriate email HTML and Telegram message for this type, e.g.:
-  > "Your travel request TR-2026-0012 has been assigned. Vehicle: ABC-1234 (Toyota HiAce). Driver: John Doe. Pickup: Feb 20, 2026 at 9:00 AM."
+- Add two new notification types to the `NotificationPayload` type: `"trip_dispatched"` and `"trip_in_progress"`
+- Build appropriate messages for each:
+  - **Dispatched:** "Your travel request TR-XXXX-XXXX has been dispatched. Vehicle ABC-1234 and driver John Doe are on their way. Pickup: Feb 20, 2026 at 9:00 AM."
+  - **In Progress:** "Your travel request TR-XXXX-XXXX trip is now in progress."
+- Reuse existing email HTML template and Telegram formatting patterns
 
-### 2. Call the notification from the allocation hooks
+### 2. Add notification calls in `useUpdateAllocationStatus`
 **File:** `src/hooks/useAllocations.ts`
 
-- In `useCreateAllocation` `mutationFn`: after successfully creating the allocation and updating the request status, fetch the vehicle registration, driver name, and request details, then call `supabase.functions.invoke('send-notification')` with type `allocation_assigned` and the requester's user ID
-- In `useCreateTripPool` `mutationFn`: similarly, after creating the pool and allocations, send a notification to each requester in the pool
+- After successfully updating status to `dispatched` or `in_progress`, fire-and-forget a notification call
+- Fetch the request details (request_number, route, requester_id, pickup_datetime), vehicle info, and driver name from the allocation data
+- Call `supabase.functions.invoke('send-notification')` with the appropriate type
 
-The notification call will be fire-and-forget (non-blocking) so allocation creation is not slowed down or blocked if the notification fails.
+### 3. Add notification calls in `useBulkUpdateAllocationStatus`
+**File:** `src/hooks/useAllocations.ts`
 
-### 3. No database changes needed
-The existing `profiles` table already stores `email`, `telegram_chat_id`, and `full_name` -- all required for sending notifications.
+- Same logic as above but for pooled trips -- send a notification to each requester in the pool when bulk status changes to dispatched or in_progress
 
 ## Technical Details
 
-**New payload shape for `allocation_assigned`:**
-```typescript
-{
-  recipientUserId: string;
-  type: "allocation_assigned";
-  details: {
-    requestNumber: string;
-    route: string;          // "Location A -> Location B"
-    vehicleInfo: string;    // "ABC-1234 (Toyota HiAce)"
-    driverName: string;     // "John Doe"
-    pickupDatetime: string; // ISO datetime
-  }
+**New payload types:**
+```text
+type: "trip_dispatched" | "trip_in_progress"
+details: {
+  requestNumber: string
+  route: string
+  vehicleInfo: string   (for dispatched)
+  driverName: string    (for dispatched)
+  pickupDatetime: string (for dispatched)
 }
 ```
 
-**Edge function message template (email):**
-- Subject: "Travel Request TR-XXXX-XXXX - Vehicle & Driver Assigned"
-- Body: Assignment confirmation with vehicle, driver, and pickup details
+**Edge function templates:**
 
-**Edge function message template (Telegram):**
-- Same content formatted with HTML bold tags for readability
+Dispatched email subject: "Travel Request TR-XXXX - Trip Dispatched"
+Dispatched body: Vehicle and driver details with pickup time, informing requester the vehicle is on its way.
+
+In-progress email subject: "Travel Request TR-XXXX - Trip In Progress"
+In-progress body: Simple confirmation that the trip has started.
+
+**No database changes needed.** All required data (profiles, vehicles, drivers) is already accessible.
 
