@@ -31,10 +31,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Locations() {
   const { data: locations, isLoading } = useLocations();
   const deleteLocation = useDeleteLocation();
+  const isMobile = useIsMobile();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -72,6 +74,45 @@ export default function Locations() {
     setDialogOpen(true);
   };
 
+  const renderMobileCards = () => (
+    <div className="space-y-3">
+      {filteredLocations?.map((location) => (
+        <Card key={location.id}>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <p className="font-semibold text-sm">{location.name}</p>
+                <code className="text-xs px-1.5 py-0.5 bg-muted rounded">{location.code}</code>
+              </div>
+              <StatusBadge status={location.is_active ? 'active' : 'inactive'} />
+            </div>
+            <p className="text-sm text-muted-foreground">{location.city || '-'}</p>
+            {location.operating_hours_start && location.operating_hours_end && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {location.operating_hours_start.slice(0, 5)} - {location.operating_hours_end.slice(0, 5)}
+              </p>
+            )}
+            <div className="flex justify-end mt-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleEdit(location)}>
+                    <Pencil className="mr-2 h-4 w-4" />Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDelete(location)} className="text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />Deactivate
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -91,7 +132,7 @@ export default function Locations() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
+              <div className="relative flex-1 w-full sm:max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search locations..."
@@ -121,6 +162,8 @@ export default function Locations() {
                   </Button>
                 )}
               </div>
+            ) : isMobile ? (
+              renderMobileCards()
             ) : (
               <div className="rounded-md border">
                 <Table>
@@ -139,9 +182,7 @@ export default function Locations() {
                       <TableRow key={location.id}>
                         <TableCell className="font-medium">{location.name}</TableCell>
                         <TableCell>
-                          <code className="px-2 py-1 bg-muted rounded text-sm">
-                            {location.code}
-                          </code>
+                          <code className="px-2 py-1 bg-muted rounded text-sm">{location.code}</code>
                         </TableCell>
                         <TableCell>{location.city || '-'}</TableCell>
                         <TableCell>
@@ -161,15 +202,10 @@ export default function Locations() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => handleEdit(location)}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
+                                <Pencil className="mr-2 h-4 w-4" />Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(location)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Deactivate
+                              <DropdownMenuItem onClick={() => handleDelete(location)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />Deactivate
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -184,14 +220,8 @@ export default function Locations() {
         </Card>
       </div>
 
-      {/* Location Dialog */}
-      <LocationDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        location={selectedLocation}
-      />
+      <LocationDialog open={dialogOpen} onOpenChange={setDialogOpen} location={selectedLocation} />
 
-      {/* Delete Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

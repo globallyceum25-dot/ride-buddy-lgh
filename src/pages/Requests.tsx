@@ -32,6 +32,7 @@ import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
 import { useMyRequests, useCancelRequest, TravelRequest } from '@/hooks/useRequests';
 import { Database } from '@/integrations/supabase/types';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type RequestStatus = Database['public']['Enums']['request_status'];
 
@@ -52,6 +53,7 @@ export default function Requests() {
   const [viewRequestId, setViewRequestId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const isMobile = useIsMobile();
 
   const { data: requests = [], isLoading } = useMyRequests(
     statusFilter === 'all' ? undefined : statusFilter
@@ -80,6 +82,52 @@ export default function Requests() {
   
   const canCancel = (status: RequestStatus) => 
     !['cancelled', 'completed', 'in_progress', 'allocated'].includes(status);
+
+  const renderMobileCards = () => (
+    <div className="space-y-3">
+      {filteredRequests.map((request) => (
+        <Card key={request.id} className="overflow-hidden">
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <span className="font-semibold text-sm">{request.request_number}</span>
+              <div className="flex items-center gap-1.5">
+                <RequestPriorityBadge priority={request.priority} />
+                <RequestStatusBadge status={request.status} />
+              </div>
+            </div>
+            <p className="text-sm text-muted-foreground truncate mb-1">{request.purpose}</p>
+            <div className="text-sm mb-1">
+              <span>{request.pickup_location}</span>
+              <span className="text-muted-foreground"> → {request.dropoff_location}</span>
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-xs text-muted-foreground">
+                {format(new Date(request.pickup_datetime), 'MMM d, yyyy · h:mm a')}
+              </span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">Actions</Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setViewRequestId(request.id)}>
+                    <Eye className="h-4 w-4 mr-2" />View Details
+                  </DropdownMenuItem>
+                  {canEdit(request.status) && (
+                    <DropdownMenuItem><Edit className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
+                  )}
+                  {canCancel(request.status) && (
+                    <DropdownMenuItem onClick={() => handleCancel(request.id)} className="text-destructive">
+                      <X className="h-4 w-4 mr-2" />Cancel
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 
   return (
     <DashboardLayout>
@@ -131,7 +179,7 @@ export default function Requests() {
           </CardContent>
         </Card>
 
-        {/* Requests Table */}
+        {/* Requests Table / Cards */}
         <Card>
           <CardHeader>
             <CardTitle>Travel Requests</CardTitle>
@@ -160,6 +208,8 @@ export default function Requests() {
                   </Button>
                 )}
               </div>
+            ) : isMobile ? (
+              renderMobileCards()
             ) : (
               <div className="rounded-md border">
                 <Table>

@@ -38,10 +38,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Vehicles() {
   const { data: vehicles, isLoading } = useVehicles();
   const deleteVehicle = useDeleteVehicle();
+  const isMobile = useIsMobile();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -55,9 +57,7 @@ export default function Vehicles() {
       vehicle.registration_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vehicle.make?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       vehicle.model?.toLowerCase().includes(searchQuery.toLowerCase());
-    
     const matchesStatus = statusFilter === 'all' || vehicle.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   });
 
@@ -84,6 +84,51 @@ export default function Vehicles() {
     setDialogOpen(true);
   };
 
+  const renderMobileCards = () => (
+    <div className="space-y-3">
+      {filteredVehicles?.map((vehicle) => (
+        <Card key={vehicle.id} className={!vehicle.is_active ? 'opacity-60' : ''}>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <code className="px-2 py-1 bg-muted rounded text-sm font-semibold">
+                {vehicle.registration_number}
+              </code>
+              <StatusBadge status={vehicle.status || 'available'} />
+            </div>
+            <p className="text-sm mb-1">
+              {vehicle.make && vehicle.model
+                ? `${vehicle.make} ${vehicle.model}`
+                : vehicle.make || vehicle.model || '-'}
+              {vehicle.year && <span className="text-muted-foreground ml-1">({vehicle.year})</span>}
+            </p>
+            <p className="text-sm text-muted-foreground mb-1 capitalize">
+              {vehicle.vehicle_type?.replace('_', ' ') || '-'} · {vehicle.location?.name || '-'}
+            </p>
+            <div className="flex items-center justify-between mt-3">
+              <div className="flex gap-1">
+                <ExpiryBadge date={vehicle.insurance_expiry} />
+                <ExpiryBadge date={vehicle.registration_expiry} />
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleEdit(vehicle)}>
+                    <Pencil className="mr-2 h-4 w-4" />Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDelete(vehicle)} className="text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />Deactivate
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -103,7 +148,7 @@ export default function Vehicles() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
+              <div className="relative flex-1 w-full sm:max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search vehicles..."
@@ -113,7 +158,7 @@ export default function Vehicles() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,6 +193,8 @@ export default function Vehicles() {
                   </Button>
                 )}
               </div>
+            ) : isMobile ? (
+              renderMobileCards()
             ) : (
               <div className="rounded-md border overflow-x-auto">
                 <Table>
@@ -181,9 +228,7 @@ export default function Vehicles() {
                         <TableCell className="capitalize">
                           {vehicle.vehicle_type?.replace('_', ' ') || '-'}
                         </TableCell>
-                        <TableCell>
-                          {vehicle.location?.name || '-'}
-                        </TableCell>
+                        <TableCell>{vehicle.location?.name || '-'}</TableCell>
                         <TableCell>
                           <StatusBadge status={vehicle.status || 'available'} />
                         </TableCell>
@@ -202,15 +247,10 @@ export default function Vehicles() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => handleEdit(vehicle)}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
+                                <Pencil className="mr-2 h-4 w-4" />Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(vehicle)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Deactivate
+                              <DropdownMenuItem onClick={() => handleDelete(vehicle)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />Deactivate
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -225,14 +265,8 @@ export default function Vehicles() {
         </Card>
       </div>
 
-      {/* Vehicle Dialog */}
-      <VehicleDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        vehicle={selectedVehicle}
-      />
+      <VehicleDialog open={dialogOpen} onOpenChange={setDialogOpen} vehicle={selectedVehicle} />
 
-      {/* Delete Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -24,16 +24,81 @@ import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
 import { usePendingApprovals, useApprovalRequests, TravelRequest } from '@/hooks/useRequests';
 import { Database } from '@/integrations/supabase/types';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 type RequestStatus = Database['public']['Enums']['request_status'];
 
 export default function Approvals() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const isMobile = useIsMobile();
 
   const { data: pendingRequests = [], isLoading: loadingPending } = usePendingApprovals();
   const { data: approvedRequests = [], isLoading: loadingApproved } = useApprovalRequests('approved' as RequestStatus);
   const { data: rejectedRequests = [], isLoading: loadingRejected } = useApprovalRequests('rejected' as RequestStatus);
+
+  const renderMobileCards = (
+    requests: TravelRequest[],
+    isLoading: boolean,
+    emptyMessage: string,
+    showActions = true
+  ) => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      );
+    }
+
+    if (requests.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium">No requests</h3>
+          <p className="text-muted-foreground">{emptyMessage}</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {requests.map((request) => (
+          <Card key={request.id} className="overflow-hidden">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <span className="font-semibold text-sm">{request.request_number}</span>
+                <RequestPriorityBadge priority={request.priority} />
+              </div>
+              <div className="text-sm mb-1">
+                {request.is_guest_request ? (
+                  <span className="font-medium">{request.guest_name || 'Guest'}</span>
+                ) : (
+                  <span className="font-medium">{request.requester?.full_name}</span>
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground mb-1">
+                {request.pickup_location} → {request.dropoff_location}
+              </div>
+              <div className="flex items-center justify-between mt-3">
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(request.pickup_datetime), 'MMM d, yyyy · h:mm a')}
+                </span>
+                {showActions ? (
+                  <Button size="sm" onClick={() => setSelectedRequestId(request.id)}>Review</Button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <RequestStatusBadge status={request.status} />
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedRequestId(request.id)}>View</Button>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  };
 
   const renderRequestTable = (
     requests: TravelRequest[],
@@ -57,6 +122,10 @@ export default function Approvals() {
           <p className="text-muted-foreground">{emptyMessage}</p>
         </div>
       );
+    }
+
+    if (isMobile) {
+      return renderMobileCards(requests, isLoading, emptyMessage, showActions);
     }
 
     return (
@@ -165,7 +234,7 @@ export default function Approvals() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Pending</CardTitle>

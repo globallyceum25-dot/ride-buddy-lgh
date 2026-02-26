@@ -5,6 +5,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TripBlock } from './TripPreviewCard';
 import type { ScheduledTrip } from '@/hooks/useTripSchedule';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Badge } from '@/components/ui/badge';
 
 interface WeekTimelineViewProps {
   weekStart: Date;
@@ -28,13 +30,13 @@ export function WeekTimelineView({
   isLoading,
 }: WeekTimelineViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   const weekDays = useMemo(() => {
     const start = startOfWeek(weekStart, { weekStartsOn: 1 });
     return Array.from({ length: 7 }, (_, i) => addDays(start, i));
   }, [weekStart]);
 
-  // Group trips by day
   const tripsByDay = useMemo(() => {
     const grouped: Record<string, ScheduledTrip[]> = {};
     trips.forEach(trip => {
@@ -59,6 +61,75 @@ export function WeekTimelineView({
     );
   }
 
+  // Mobile: scrollable day-by-day list
+  if (isMobile) {
+    return (
+      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+        {/* Day selector - horizontal scroll */}
+        <div className="flex overflow-x-auto border-b bg-muted/30">
+          {weekDays.map((day) => {
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const dayTrips = tripsByDay[dateStr] || [];
+            const isSelected = isSameDay(day, selectedDate);
+            const isDayToday = isToday(day);
+
+            return (
+              <button
+                key={dateStr}
+                onClick={() => onSelectDate(day)}
+                className={cn(
+                  'flex-shrink-0 px-4 py-3 text-center transition-colors min-w-[60px]',
+                  'hover:bg-accent/50 focus:outline-none',
+                  isSelected && 'bg-primary/10 border-b-2 border-primary',
+                  isDayToday && !isSelected && 'bg-accent/50'
+                )}
+              >
+                <div className="text-xs text-muted-foreground uppercase">{format(day, 'EEE')}</div>
+                <div className={cn('text-lg font-semibold', isDayToday && 'text-primary')}>
+                  {format(day, 'd')}
+                </div>
+                {dayTrips.length > 0 && (
+                  <Badge variant="secondary" className="text-[10px] px-1 py-0 mt-0.5">
+                    {dayTrips.length}
+                  </Badge>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Selected day's trips */}
+        <div className="p-3 space-y-2 max-h-[500px] overflow-y-auto">
+          {(() => {
+            const dateStr = format(selectedDate, 'yyyy-MM-dd');
+            const dayTrips = (tripsByDay[dateStr] || []).sort(
+              (a, b) => new Date(a.scheduledTime).getTime() - new Date(b.scheduledTime).getTime()
+            );
+
+            if (dayTrips.length === 0) {
+              return (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No trips on {format(selectedDate, 'EEEE, MMM d')}
+                </p>
+              );
+            }
+
+            return dayTrips.map((trip) => (
+              <TripBlock
+                key={trip.id}
+                trip={trip}
+                onClick={() => onSelectDate(selectedDate)}
+                onStartTrip={onStartTrip}
+                onCompleteTrip={onCompleteTrip}
+              />
+            ));
+          })()}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop: full 7-column timeline grid
   return (
     <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
       {/* Day headers */}
@@ -107,12 +178,9 @@ export function WeekTimelineView({
         <div className="min-w-[800px]">
           {HOURS.map((hour) => (
             <div key={hour} className="grid grid-cols-8 border-b last:border-b-0">
-              {/* Time column */}
               <div className="p-2 border-r text-center text-xs text-muted-foreground bg-muted/10">
                 {format(new Date().setHours(hour, 0), 'h a')}
               </div>
-
-              {/* Day columns */}
               {weekDays.map((day) => {
                 const dateStr = format(day, 'yyyy-MM-dd');
                 const dayTrips = tripsByDay[dateStr] || [];

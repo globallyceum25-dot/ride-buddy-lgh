@@ -92,7 +92,7 @@ export default function Reports() {
 
         {/* Report Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
+          <TabsList className="w-full overflow-x-auto flex-nowrap sm:grid sm:grid-cols-4 lg:w-[500px]">
             <TabsTrigger value="vehicle">Vehicle</TabsTrigger>
             <TabsTrigger value="driver">Driver</TabsTrigger>
             <TabsTrigger value="location">Location</TabsTrigger>
