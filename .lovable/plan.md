@@ -1,54 +1,73 @@
 
-
-# Send Approval Request Notifications to Approvers via Telegram and Email
+# Mobile Responsive Overhaul
 
 ## Overview
-When a travel request is submitted (status set to `pending_approval`), notify the assigned approver via both Telegram and email so they can take action promptly.
+The app has a solid desktop layout with a responsive sidebar (hamburger menu on mobile), but data-heavy pages use wide HTML tables and horizontal layouts that break on small screens. The best approach is to introduce **mobile card layouts** as an alternative to tables, and fix specific overflow/layout issues across all pages.
 
-## Changes
+## Strategy
+Rather than just adding `overflow-x-auto` (which forces horizontal scrolling -- poor UX), we will render **stacked card views on mobile** and keep tables on desktop. This uses the existing `useIsMobile()` hook to conditionally render the appropriate layout.
 
-### 1. Update the `send-notification` edge function
-**File:** `supabase/functions/send-notification/index.ts`
+## Changes by File
 
-- Add a new notification type: `"approval_requested"`
-- Build message templates:
-  - **Email subject:** "Travel Request TR-XXXX-XXXX - Approval Required"
-  - **Email body:** "A new travel request TR-XXXX-XXXX requires your approval. Route: Location A to Location B. Requester: Jane Smith. Pickup: Feb 20, 2026 at 9:00 AM. Purpose: [purpose text]."
-  - **Telegram:** Same content with HTML bold formatting and a clipboard emoji
-- Add new optional detail fields: `requesterName` and `purpose`
+### 1. Create a reusable `MobileCardList` pattern component
+**New file:** `src/components/shared/ResponsiveTable.tsx`
 
-### 2. Trigger notification in `useCreateRequest`
-**File:** `src/hooks/useRequests.ts`
+A wrapper that accepts both a table and a mobile card renderer. On desktop (>=768px) it shows the table; on mobile it renders a vertical card list. This avoids duplicating the conditional logic in every page.
 
-- After the request is created and the history entry is logged (around line 415), add a fire-and-forget notification call
-- The request already has `approver_id`, `request_number`, route info, and `pickup_datetime` available from the insert response
-- Fetch the requester's name from the current user's profile
-- Call `supabase.functions.invoke('send-notification')` with:
-  - `recipientUserId`: the `approver_id`
-  - `type`: `"approval_requested"`
-  - `details`: request number, route, pickup datetime, requester name, purpose
+### 2. Requests page (`src/pages/Requests.tsx`)
+- Replace the raw `<Table>` with the responsive pattern
+- Mobile card: shows request number, status badge, route, date, and an actions button
+- Each card is a compact vertical layout with key info
 
-### 3. Trigger notification in `submit-public-request` edge function
-**File:** `supabase/functions/submit-public-request/index.ts`
+### 3. Approvals page (`src/pages/Approvals.tsx`)
+- Same pattern for the three tabs (pending/approved/rejected)
+- Mobile cards show requester, request number, route, priority, and Review/View button
 
-- After the public request is created, send the same `approval_requested` notification to the `default_approver_id`
-- Use the guest name as the requester name
+### 4. Allocations page (`src/pages/Allocations.tsx`)
+- **Pending Allocation table**: mobile card layout with assign/reschedule/close actions
+- **Kanban Board**: on mobile, switch from horizontal scroll `flex` columns to a **vertical stacked accordion** -- each status column becomes a collapsible section so users can tap to expand
+- **Table view**: responsive card layout
 
-## Technical Details
+### 5. Vehicles page (`src/pages/Vehicles.tsx`)
+- Mobile card with registration number, vehicle name, status badge, location, and action menu
 
-**New payload type:**
-```text
-type: "approval_requested"
-details: {
-  requestNumber: string
-  route: string
-  pickupDatetime: string
-  requesterName: string
-  purpose: string
-}
-```
+### 6. Drivers page (`src/pages/Drivers.tsx`)
+- Mobile card with driver name, license info, status, location, and action menu
 
-**No database changes needed.** All required data is already available at the point of request creation.
+### 7. Users page (`src/pages/Users.tsx`)
+- Mobile card with name, email, role badges, status, and action menu
+- Wrap the table in `overflow-x-auto` as a fallback
 
-The notification calls are fire-and-forget so request creation is never blocked by notification failures.
+### 8. Locations page (`src/pages/Locations.tsx`)
+- Mobile card with location name, code, city, status, and action menu
 
+### 9. Reports page (`src/pages/Reports.tsx`)
+- Make the TabsList scrollable on mobile (already `grid-cols-4` which is tight)
+- Report sub-components likely have their own tables -- add `overflow-x-auto` wrappers
+
+### 10. Settings page (`src/pages/Settings.tsx`)
+- The `TabsList` with 6 tabs needs horizontal scroll on mobile -- add `overflow-x-auto` and `w-full` with `flex-nowrap` instead of `flex-wrap`
+
+### 11. Kanban Board mobile view (`src/components/allocations/KanbanBoard.tsx`)
+- Replace horizontal column layout with vertical collapsible sections using the existing `Collapsible` component
+- Each column header shows title + count badge, tapping expands to show cards
+- Drag-and-drop is disabled on mobile (poor touch UX) -- instead, use action buttons on each card
+
+### 12. Trip Schedule calendar views
+- `DetailedCalendarView.tsx` already uses `useIsMobile()` with a Sheet -- verify it works well
+- `WeekTimelineView.tsx`: on mobile, switch from 7-column grid to a scrollable day-by-day list
+
+## Technical Approach
+
+- Use the existing `useIsMobile()` hook throughout
+- Create a simple `MobileCard` component pattern (not a full abstraction -- just a consistent styling approach)
+- Mobile cards use: `Card` with padding, flex layout, key-value pairs stacked vertically
+- Action menus remain as `DropdownMenu` (already mobile-friendly)
+- All changes are purely presentational -- no data/hook changes needed
+
+## Implementation Order
+1. Requests + Approvals (most used by staff/approvers on phones)
+2. Allocations page (Kanban + tables)
+3. Vehicles, Drivers, Users, Locations (similar pattern)
+4. Settings + Reports (minor fixes)
+5. Trip Schedule refinements
