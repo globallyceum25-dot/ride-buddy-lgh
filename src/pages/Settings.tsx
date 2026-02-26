@@ -20,7 +20,7 @@ export default function Settings() {
         </div>
 
         <Tabs defaultValue="general" className="space-y-4">
-          <TabsList className="flex-wrap">
+          <TabsList className="w-full overflow-x-auto flex-nowrap justify-start">
             <TabsTrigger value="general" className="gap-2">
               <SettingsIcon className="h-4 w-4" />
               General

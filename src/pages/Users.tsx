@@ -2,6 +2,7 @@ import { useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -30,6 +31,7 @@ import { useUsers, useToggleUserActive, UserWithDetails, AppRole } from '@/hooks
 import { CreateUserDialog } from '@/components/users/CreateUserDialog';
 import { EditUserDialog } from '@/components/users/EditUserDialog';
 import { RoleManagementDialog } from '@/components/users/RoleManagementDialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const ROLE_COLORS: Record<AppRole, string> = {
   staff: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
@@ -50,6 +52,7 @@ const ROLE_LABELS: Record<AppRole, string> = {
 export default function UsersPage() {
   const { data: users, isLoading } = useUsers();
   const toggleActive = useToggleUserActive();
+  const isMobile = useIsMobile();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -60,23 +63,74 @@ export default function UsersPage() {
   const [roleUser, setRoleUser] = useState<UserWithDetails | null>(null);
 
   const filteredUsers = users?.filter(user => {
-    // Search filter
     const searchLower = searchQuery.toLowerCase();
     const matchesSearch = !searchQuery || 
       user.full_name.toLowerCase().includes(searchLower) ||
       user.email.toLowerCase().includes(searchLower) ||
       user.employee_id?.toLowerCase().includes(searchLower);
-
-    // Role filter
     const matchesRole = roleFilter === 'all' || user.roles.includes(roleFilter as AppRole);
-
-    // Status filter
     const matchesStatus = statusFilter === 'all' ||
       (statusFilter === 'active' && user.is_active) ||
       (statusFilter === 'inactive' && !user.is_active);
-
     return matchesSearch && matchesRole && matchesStatus;
   });
+
+  const renderActionMenu = (user: UserWithDetails) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setEditUser(user)}>
+          <Pencil className="mr-2 h-4 w-4" />Edit Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setRoleUser(user)}>
+          <Shield className="mr-2 h-4 w-4" />Manage Roles
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => toggleActive.mutate({ userId: user.user_id, isActive: !user.is_active })}>
+          {user.is_active ? (
+            <><UserX className="mr-2 h-4 w-4" />Deactivate</>
+          ) : (
+            <><UserCheck className="mr-2 h-4 w-4" />Activate</>
+          )}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const renderMobileCards = () => (
+    <div className="space-y-3">
+      {filteredUsers?.map((user) => (
+        <Card key={user.id}>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <p className="font-semibold text-sm">{user.full_name}</p>
+                <p className="text-xs text-muted-foreground">{user.email}</p>
+              </div>
+              <StatusBadge status={user.is_active ? 'active' : 'inactive'} />
+            </div>
+            <div className="flex flex-wrap gap-1 mb-2">
+              {user.roles.map(role => (
+                <Badge key={role} variant="secondary" className={ROLE_COLORS[role]}>
+                  {ROLE_LABELS[role]}
+                </Badge>
+              ))}
+              {user.roles.length === 0 && (
+                <span className="text-muted-foreground text-xs">No roles</span>
+              )}
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">
+                {user.primary_location?.name || '—'} · {user.department || '—'}
+              </span>
+              {renderActionMenu(user)}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 
   return (
     <DashboardLayout>
@@ -129,44 +183,34 @@ export default function UsersPage() {
           </Select>
         </div>
 
-        {/* Table */}
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Roles</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Department</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[60px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+        {/* Table / Cards */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Users className="h-8 w-8 text-muted-foreground animate-pulse" />
+          </div>
+        ) : filteredUsers?.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Users className="h-8 w-8 text-muted-foreground mb-2" />
+            <p className="text-muted-foreground">No users found</p>
+          </div>
+        ) : isMobile ? (
+          renderMobileCards()
+        ) : (
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    Loading users...
-                  </TableCell>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Roles</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Department</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
-              ) : filteredUsers?.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
-                    <div className="flex flex-col items-center gap-2">
-                      <Users className="h-8 w-8 text-muted-foreground" />
-                      <p className="text-muted-foreground">No users found</p>
-                      {!searchQuery && !roleFilter && statusFilter === 'all' && (
-                        <Button variant="outline" size="sm" onClick={() => setCreateDialogOpen(true)}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Add your first user
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredUsers?.map((user) => (
+              </TableHeader>
+              <TableBody>
+                {filteredUsers?.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.full_name}</TableCell>
                     <TableCell>{user.email}</TableCell>
@@ -183,9 +227,7 @@ export default function UsersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {user.primary_location?.name || (
-                        <span className="text-muted-foreground">—</span>
-                      )}
+                      {user.primary_location?.name || <span className="text-muted-foreground">—</span>}
                     </TableCell>
                     <TableCell>
                       {user.department || <span className="text-muted-foreground">—</span>}
@@ -193,49 +235,15 @@ export default function UsersPage() {
                     <TableCell>
                       <StatusBadge status={user.is_active ? 'active' : 'inactive'} />
                     </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setEditUser(user)}>
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit Profile
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setRoleUser(user)}>
-                            <Shield className="mr-2 h-4 w-4" />
-                            Manage Roles
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => toggleActive.mutate({ userId: user.user_id, isActive: !user.is_active })}
-                          >
-                            {user.is_active ? (
-                              <>
-                                <UserX className="mr-2 h-4 w-4" />
-                                Deactivate
-                              </>
-                            ) : (
-                              <>
-                                <UserCheck className="mr-2 h-4 w-4" />
-                                Activate
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+                    <TableCell>{renderActionMenu(user)}</TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
-      {/* Dialogs */}
       <CreateUserDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
       <EditUserDialog user={editUser} open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)} />
       <RoleManagementDialog user={roleUser} open={!!roleUser} onOpenChange={(open) => !open && setRoleUser(null)} />

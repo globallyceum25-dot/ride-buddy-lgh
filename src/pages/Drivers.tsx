@@ -39,10 +39,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Drivers() {
   const { data: drivers, isLoading } = useDrivers();
   const deleteDriver = useDeleteDriver();
+  const isMobile = useIsMobile();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -56,9 +58,7 @@ export default function Drivers() {
       driver.profile?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       driver.profile?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       driver.license_number?.toLowerCase().includes(searchQuery.toLowerCase());
-    
     const matchesStatus = statusFilter === 'all' || driver.status === statusFilter;
-    
     return matchesSearch && matchesStatus;
   });
 
@@ -85,6 +85,50 @@ export default function Drivers() {
     setDialogOpen(true);
   };
 
+  const renderMobileCards = () => (
+    <div className="space-y-3">
+      {filteredDrivers?.map((driver) => (
+        <Card key={driver.id} className={!driver.is_active ? 'opacity-60' : ''}>
+          <CardContent className="p-4">
+            <div className="flex items-start justify-between gap-2 mb-2">
+              <div>
+                <p className="font-semibold text-sm">{driver.profile?.full_name || 'Unknown'}</p>
+                <p className="text-xs text-muted-foreground">{driver.profile?.email}</p>
+              </div>
+              <StatusBadge status={driver.status || 'available'} />
+            </div>
+            <div className="flex items-center gap-2 mb-1">
+              <code className="px-2 py-0.5 bg-muted rounded text-xs">{driver.license_number}</code>
+              {driver.license_type && (
+                <span className="text-xs text-muted-foreground capitalize">{driver.license_type}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>{driver.location?.name || '-'}</span>
+              {driver.is_floating && <Badge variant="outline" className="text-xs">Floating</Badge>}
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <ExpiryBadge date={driver.license_expiry} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleEdit(driver)}>
+                    <Pencil className="mr-2 h-4 w-4" />Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleDelete(driver)} className="text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />Deactivate
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -104,7 +148,7 @@ export default function Drivers() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="relative flex-1 max-w-sm">
+              <div className="relative flex-1 w-full sm:max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search drivers..."
@@ -114,7 +158,7 @@ export default function Drivers() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -148,6 +192,8 @@ export default function Drivers() {
                   </Button>
                 )}
               </div>
+            ) : isMobile ? (
+              renderMobileCards()
             ) : (
               <div className="rounded-md border overflow-x-auto">
                 <Table>
@@ -186,9 +232,7 @@ export default function Drivers() {
                           <div className="flex items-center gap-2">
                             <span>{driver.location?.name || '-'}</span>
                             {driver.is_floating && (
-                              <Badge variant="outline" className="text-xs">
-                                Floating
-                              </Badge>
+                              <Badge variant="outline" className="text-xs">Floating</Badge>
                             )}
                           </div>
                         </TableCell>
@@ -212,15 +256,10 @@ export default function Drivers() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => handleEdit(driver)}>
-                                <Pencil className="mr-2 h-4 w-4" />
-                                Edit
+                                <Pencil className="mr-2 h-4 w-4" />Edit
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(driver)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Deactivate
+                              <DropdownMenuItem onClick={() => handleDelete(driver)} className="text-destructive">
+                                <Trash2 className="mr-2 h-4 w-4" />Deactivate
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -235,14 +274,8 @@ export default function Drivers() {
         </Card>
       </div>
 
-      {/* Driver Dialog */}
-      <DriverDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        driver={selectedDriver}
-      />
+      <DriverDialog open={dialogOpen} onOpenChange={setDialogOpen} driver={selectedDriver} />
 
-      {/* Delete Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
