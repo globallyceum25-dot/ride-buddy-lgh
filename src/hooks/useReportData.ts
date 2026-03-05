@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 export interface ReportFilters {
   startDate: string;
   endDate: string;
+  tripType?: 'all' | 'fleet' | 'hailing';
 }
 
 // Vehicle Report Types
@@ -105,6 +106,7 @@ export function useVehicleReport(filters: ReportFilters) {
           id,
           vehicle_id,
           status,
+          hailing_service,
           odometer_start,
           odometer_end,
           scheduled_pickup,
@@ -123,10 +125,17 @@ export function useVehicleReport(filters: ReportFilters) {
 
       if (error) throw error;
 
+      // Filter by trip type
+      const filtered = (allocations || []).filter(a => {
+        if (filters.tripType === 'fleet') return !a.hailing_service;
+        if (filters.tripType === 'hailing') return !!a.hailing_service;
+        return true;
+      });
+
       // Aggregate by vehicle
       const vehicleMap = new Map<string, VehicleReportItem>();
 
-      allocations?.forEach((allocation) => {
+      filtered.forEach((allocation) => {
         const vehicle = allocation.vehicles;
         if (!vehicle || !allocation.vehicle_id) return;
 
@@ -187,6 +196,7 @@ export function useDriverReport(filters: ReportFilters) {
           id,
           driver_id,
           status,
+          hailing_service,
           actual_pickup,
           actual_dropoff,
           scheduled_pickup,
@@ -201,8 +211,15 @@ export function useDriverReport(filters: ReportFilters) {
 
       if (error) throw error;
 
+      // Filter by trip type
+      const filtered = (allocations || []).filter(a => {
+        if (filters.tripType === 'fleet') return !a.hailing_service;
+        if (filters.tripType === 'hailing') return !!a.hailing_service;
+        return true;
+      });
+
       // Get driver user IDs for profile lookup
-      const driverUserIds = [...new Set(allocations?.map(a => a.drivers?.user_id).filter(Boolean) as string[])];
+      const driverUserIds = [...new Set(filtered.map(a => a.drivers?.user_id).filter(Boolean) as string[])];
       
       const { data: profiles } = await supabase
         .from('profiles')
@@ -214,7 +231,7 @@ export function useDriverReport(filters: ReportFilters) {
       // Aggregate by driver
       const driverMap = new Map<string, DriverReportItem>();
 
-      allocations?.forEach((allocation) => {
+      filtered.forEach((allocation) => {
         const driver = allocation.drivers;
         if (!driver || !allocation.driver_id) return;
 
@@ -278,6 +295,26 @@ export function useLocationReport(filters: ReportFilters) {
 
       if (error) throw error;
 
+      // If trip type filter is active, we need to check allocations
+      let filteredRequestIds: Set<string> | null = null;
+      if (filters.tripType === 'fleet' || filters.tripType === 'hailing') {
+        const { data: allocs } = await supabase
+          .from('allocations')
+          .select('request_id, hailing_service')
+          .gte('scheduled_pickup', filters.startDate)
+          .lte('scheduled_pickup', filters.endDate + 'T23:59:59');
+        
+        filteredRequestIds = new Set(
+          (allocs || [])
+            .filter(a => filters.tripType === 'fleet' ? !a.hailing_service : !!a.hailing_service)
+            .map(a => a.request_id)
+        );
+      }
+
+      const filteredRequests = filteredRequestIds 
+        ? (requests || []).filter(r => filteredRequestIds!.has(r.id))
+        : (requests || []);
+
       const { data: locations } = await supabase
         .from('locations')
         .select('id, name, code');
@@ -288,7 +325,7 @@ export function useLocationReport(filters: ReportFilters) {
       const locationStats = new Map<string, { asOrigin: number; asDestination: number }>();
       const routeStats = new Map<string, number>();
 
-      requests?.forEach((request) => {
+      filteredRequests.forEach((request) => {
         // Origin stats
         const originStats = locationStats.get(request.pickup_location) || { asOrigin: 0, asDestination: 0 };
         originStats.asOrigin += 1;
@@ -328,7 +365,7 @@ export function useLocationReport(filters: ReportFilters) {
         items,
         routes,
         totals: {
-          totalTrips: requests?.length || 0,
+          totalTrips: filteredRequests.length,
           uniqueRoutes: routeStats.size,
         },
       };
@@ -355,8 +392,28 @@ export function useDepartmentReport(filters: ReportFilters) {
 
       if (error) throw error;
 
+      // If trip type filter is active, check allocations
+      let filteredRequestIds: Set<string> | null = null;
+      if (filters.tripType === 'fleet' || filters.tripType === 'hailing') {
+        const { data: allocs } = await supabase
+          .from('allocations')
+          .select('request_id, hailing_service')
+          .gte('scheduled_pickup', filters.startDate)
+          .lte('scheduled_pickup', filters.endDate + 'T23:59:59');
+        
+        filteredRequestIds = new Set(
+          (allocs || [])
+            .filter(a => filters.tripType === 'fleet' ? !a.hailing_service : !!a.hailing_service)
+            .map(a => a.request_id)
+        );
+      }
+
+      const filteredRequests = filteredRequestIds
+        ? (requests || []).filter(r => filteredRequestIds!.has(r.id))
+        : (requests || []);
+
       // Get requester profiles for department info
-      const requesterIds = [...new Set(requests?.map(r => r.requester_id) || [])];
+      const requesterIds = [...new Set(filteredRequests.map(r => r.requester_id))];
       
       const { data: profiles } = await supabase
         .from('profiles')
@@ -368,7 +425,7 @@ export function useDepartmentReport(filters: ReportFilters) {
       // Aggregate by department
       const deptMap = new Map<string, DepartmentReportItem>();
 
-      requests?.forEach((request) => {
+      filteredRequests.forEach((request) => {
         const department = profileMap.get(request.requester_id) || 'Unassigned';
         
         const existing = deptMap.get(department) || {
@@ -407,6 +464,80 @@ export function useDepartmentReport(filters: ReportFilters) {
           totalRequests,
           totalDepartments: items.length,
           overallCompletionRate: totalRequests > 0 ? Math.round((totalCompleted / totalRequests) * 100) : 0,
+        },
+      };
+    },
+    enabled: !!filters.startDate && !!filters.endDate,
+  });
+}
+
+// Hailing Cost Report Types
+export interface HailingCostItem {
+  provider: string;
+  tripCount: number;
+  totalFare: number;
+  avgFare: number;
+  receiptsCount: number;
+}
+
+export interface HailingCostReportData {
+  items: HailingCostItem[];
+  totals: {
+    totalTrips: number;
+    totalCost: number;
+    avgCostPerTrip: number;
+    totalWithReceipts: number;
+  };
+}
+
+// Hailing Cost Report Hook
+export function useHailingCostReport(filters: ReportFilters) {
+  return useQuery({
+    queryKey: ['hailing-cost-report', filters],
+    queryFn: async (): Promise<HailingCostReportData> => {
+      const { data: allocations, error } = await supabase
+        .from('allocations')
+        .select('id, hailing_service, fare_amount, receipt_reference, status, scheduled_pickup')
+        .not('hailing_service', 'is', null)
+        .gte('scheduled_pickup', filters.startDate)
+        .lte('scheduled_pickup', filters.endDate + 'T23:59:59');
+
+      if (error) throw error;
+
+      const providerMap = new Map<string, HailingCostItem>();
+
+      (allocations || []).forEach((a) => {
+        const provider = a.hailing_service || 'unknown';
+        const existing = providerMap.get(provider) || {
+          provider,
+          tripCount: 0,
+          totalFare: 0,
+          avgFare: 0,
+          receiptsCount: 0,
+        };
+
+        existing.tripCount += 1;
+        existing.totalFare += a.fare_amount || 0;
+        if (a.receipt_reference) existing.receiptsCount += 1;
+
+        providerMap.set(provider, existing);
+      });
+
+      const items = Array.from(providerMap.values())
+        .map(item => ({ ...item, avgFare: item.tripCount > 0 ? item.totalFare / item.tripCount : 0 }))
+        .sort((a, b) => b.totalFare - a.totalFare);
+
+      const totalTrips = items.reduce((s, i) => s + i.tripCount, 0);
+      const totalCost = items.reduce((s, i) => s + i.totalFare, 0);
+      const totalWithReceipts = items.reduce((s, i) => s + i.receiptsCount, 0);
+
+      return {
+        items,
+        totals: {
+          totalTrips,
+          totalCost,
+          avgCostPerTrip: totalTrips > 0 ? totalCost / totalTrips : 0,
+          totalWithReceipts,
         },
       };
     },

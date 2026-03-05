@@ -18,6 +18,8 @@ interface ReportFiltersProps {
   endDate: string;
   onStartDateChange: (date: string) => void;
   onEndDateChange: (date: string) => void;
+  tripType?: 'all' | 'fleet' | 'hailing';
+  onTripTypeChange?: (value: 'all' | 'fleet' | 'hailing') => void;
   onExport?: () => void;
 }
 
@@ -28,6 +30,8 @@ export function ReportFilters({
   endDate,
   onStartDateChange,
   onEndDateChange,
+  tripType = 'all',
+  onTripTypeChange,
   onExport,
 }: ReportFiltersProps) {
   const [preset, setPreset] = useState<PresetKey>('this-month');
@@ -88,6 +92,19 @@ export function ReportFilters({
           <SelectItem value="custom">Custom Range</SelectItem>
         </SelectContent>
       </Select>
+
+      {onTripTypeChange && (
+        <Select value={tripType} onValueChange={(v) => onTripTypeChange(v as 'all' | 'fleet' | 'hailing')}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Trip type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Trips</SelectItem>
+            <SelectItem value="fleet">Fleet Only</SelectItem>
+            <SelectItem value="hailing">Hailing Only</SelectItem>
+          </SelectContent>
+        </Select>
+      )}
 
       <div className="flex items-center gap-2">
         <Popover>
