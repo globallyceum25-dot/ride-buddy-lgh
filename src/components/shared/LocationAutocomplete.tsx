@@ -120,7 +120,20 @@ export function LocationAutocomplete({
       (place, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
           const displayName = place.formatted_address || prediction.description;
-          const placeName = place.name || undefined;
+          
+          // Only store place name if it's meaningfully different from the address
+          // (i.e., it's a POI/business name, not just the street address repeated)
+          let placeName: string | undefined;
+          if (place.name && displayName) {
+            const nameNorm = place.name.toLowerCase().trim();
+            const addrNorm = displayName.toLowerCase().trim();
+            // Keep the name only if the address doesn't start with it
+            // (plain address searches return the street as name)
+            if (!addrNorm.startsWith(nameNorm)) {
+              placeName = place.name;
+            }
+          }
+          
           setQuery(displayName);
           onChange(displayName, {
             lat: place.geometry.location.lat(),
