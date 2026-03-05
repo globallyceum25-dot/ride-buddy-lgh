@@ -167,7 +167,7 @@ Deno.serve(async (req) => {
               type: 'approval_requested',
               details: {
                 requestNumber: request.request_number || 'N/A',
-                route: `${requestData.pickup_location} → ${requestData.dropoff_location}`,
+                route: `${requestData.pickup_location_name || requestData.pickup_location} → ${requestData.dropoff_location_name || requestData.dropoff_location}`,
                 pickupDatetime: requestData.pickup_datetime,
                 requesterName: guestInfo.name,
                 purpose: requestData.purpose,

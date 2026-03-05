@@ -455,7 +455,7 @@ export function useCreateRequest() {
                     type: 'immediate_allocation',
                     details: {
                       requestNumber: request.request_number || 'N/A',
-                      route: `${request.pickup_location} → ${request.dropoff_location}`,
+                      route: `${request.pickup_location_name || request.pickup_location} → ${request.dropoff_location_name || request.dropoff_location}`,
                       pickupDatetime: request.pickup_datetime,
                       requesterName: profile?.full_name || 'Unknown',
                       purpose: request.purpose,
@@ -471,7 +471,7 @@ export function useCreateRequest() {
                 type: 'approval_requested',
                 details: {
                   requestNumber: request.request_number || 'N/A',
-                  route: `${request.pickup_location} → ${request.dropoff_location}`,
+                  route: `${request.pickup_location_name || request.pickup_location} → ${request.dropoff_location_name || request.dropoff_location}`,
                   pickupDatetime: request.pickup_datetime,
                   requesterName: profile?.full_name || 'Unknown',
                   purpose: request.purpose,
@@ -646,7 +646,7 @@ export function useCloseRequest() {
       // Fetch request details for notification before closing
       const { data: request } = await supabase
         .from('travel_requests')
-        .select('requester_id, request_number, pickup_location, dropoff_location')
+        .select('requester_id, request_number, pickup_location, pickup_location_name, dropoff_location, dropoff_location_name')
         .eq('id', id)
         .single();
 
@@ -674,7 +674,7 @@ export function useCloseRequest() {
             type: 'overdue_closed',
             details: {
               requestNumber: request.request_number || id,
-              route: `${request.pickup_location} → ${request.dropoff_location}`,
+              route: `${request.pickup_location_name || request.pickup_location} → ${request.dropoff_location_name || request.dropoff_location}`,
               reason,
             },
           },
@@ -723,7 +723,7 @@ export function useRescheduleRequest() {
       // Fetch request details for notification
       const { data: request } = await supabase
         .from('travel_requests')
-        .select('requester_id, request_number, pickup_location, dropoff_location')
+        .select('requester_id, request_number, pickup_location, pickup_location_name, dropoff_location, dropoff_location_name')
         .eq('id', id)
         .single();
 
@@ -754,7 +754,7 @@ export function useRescheduleRequest() {
             type: 'overdue_rescheduled',
             details: {
               requestNumber: request.request_number || id,
-              route: `${request.pickup_location} → ${request.dropoff_location}`,
+              route: `${request.pickup_location_name || request.pickup_location} → ${request.dropoff_location_name || request.dropoff_location}`,
               newPickupDate: pickupDatetime,
             },
           },
