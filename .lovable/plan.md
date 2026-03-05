@@ -1,18 +1,35 @@
 
 
-# Fix Immediate Request Notifications to Coordinators
+# Add Location Names to Notification Route Display
 
 ## Problem
-The frontend code already notifies all `location_coordinator` users when an immediate request is created (lines 443-466 in `useRequests.ts`), but the `send-notification` edge function doesn't have a handler for the `immediate_allocation` notification type. It falls into the `else` branch (overdue handler), generating an incorrect message.
+All notification payloads build the `route` field using raw addresses: `${request.pickup_location} → ${request.dropoff_location}`. When location names (e.g., "Raymond Plaza") exist, coordinators should see those instead.
 
-## Fix
+## Approach
+Use a helper pattern: `pickup_location_name || pickup_location` for each side of the route arrow. This affects every place that constructs a `route:` string for notifications.
 
-### `supabase/functions/send-notification/index.ts`
-1. Add `'immediate_allocation'` to the `NotificationPayload` type union
-2. Add a new `else if (type === "immediate_allocation")` block that builds an appropriate subject and body:
-   - Subject: `Travel Request {requestNumber} - Immediate Allocation Required`
-   - Body: `An immediate travel request {requestNumber} requires allocation.\n\nRoute: {route}\nRequester: {requesterName}\nPickup: {pickupDatetime}\nPurpose: {purpose}`
-3. Add a Telegram template with a ⚡ emoji for the immediate allocation type
+## Changes
 
-This is a single-file change to the edge function. No other files need modification since the frontend already sends the correct payload.
+### 1. `src/hooks/useRequests.ts`
+Update all 4 occurrences of:
+```
+route: `${request.pickup_location} → ${request.dropoff_location}`
+```
+to:
+```
+route: `${request.pickup_location_name || request.pickup_location} → ${request.dropoff_location_name || request.dropoff_location}`
+```
+
+### 2. `src/hooks/useAllocations.ts`
+Same change for all 4 occurrences of the route string construction (lines ~339, ~457, ~567, ~684).
+
+### 3. `supabase/functions/submit-public-request/index.ts`
+Same change for the route string at line ~170. The `requestData` object should already contain the location name fields if provided by the public form.
+
+## Files to modify
+| File | Occurrences |
+|------|------------|
+| `src/hooks/useRequests.ts` | 4 |
+| `src/hooks/useAllocations.ts` | 4 |
+| `supabase/functions/submit-public-request/index.ts` | 1 |
 
