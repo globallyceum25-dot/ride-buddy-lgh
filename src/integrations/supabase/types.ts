@@ -22,6 +22,9 @@ export type Database = {
           allocated_by: string | null
           created_at: string | null
           driver_id: string | null
+          hailing_service:
+            | Database["public"]["Enums"]["hailing_service_type"]
+            | null
           id: string
           notes: string | null
           odometer_end: number | null
@@ -41,6 +44,9 @@ export type Database = {
           allocated_by?: string | null
           created_at?: string | null
           driver_id?: string | null
+          hailing_service?:
+            | Database["public"]["Enums"]["hailing_service_type"]
+            | null
           id?: string
           notes?: string | null
           odometer_end?: number | null
@@ -60,6 +66,9 @@ export type Database = {
           allocated_by?: string | null
           created_at?: string | null
           driver_id?: string | null
+          hailing_service?:
+            | Database["public"]["Enums"]["hailing_service_type"]
+            | null
           id?: string
           notes?: string | null
           odometer_end?: number | null
@@ -876,6 +885,7 @@ export type Database = {
         | "group_admin"
       driver_status: "available" | "on_trip" | "on_leave" | "inactive"
       fuel_type: "petrol" | "diesel" | "electric" | "hybrid" | "cng"
+      hailing_service_type: "pickme" | "uber" | "personal"
       license_type: "light" | "heavy" | "commercial"
       ownership_type: "owned" | "leased" | "rented"
       pool_status:
@@ -1045,6 +1055,7 @@ export const Constants = {
       ],
       driver_status: ["available", "on_trip", "on_leave", "inactive"],
       fuel_type: ["petrol", "diesel", "electric", "hybrid", "cng"],
+      hailing_service_type: ["pickme", "uber", "personal"],
       license_type: ["light", "heavy", "commercial"],
       ownership_type: ["owned", "leased", "rented"],
       pool_status: [
