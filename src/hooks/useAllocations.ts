@@ -46,6 +46,7 @@ export interface Allocation {
     priority: string;
     status: string;
     requester_id: string;
+    estimated_distance_km: number | null;
   } | null;
   vehicle?: {
     id: string;
@@ -174,7 +175,7 @@ export function useAllocations(filters?: { status?: AllocationStatus; date?: str
           *,
           request:travel_requests(
             id, request_number, purpose, pickup_location, dropoff_location,
-            pickup_datetime, passenger_count, priority, status, requester_id
+            pickup_datetime, passenger_count, priority, status, requester_id, estimated_distance_km
           ),
           vehicle:vehicles(id, registration_number, make, model, capacity, odometer),
           driver:drivers(id, user_id, license_number),

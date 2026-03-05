@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
-import { Car, Clock, MapPin, User, MoreHorizontal, Play, CheckCircle, X, Users, Navigation, Receipt } from 'lucide-react';
+import { Car, Clock, MapPin, User, MoreHorizontal, Play, CheckCircle, X, Users, Navigation, Receipt, Route } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -243,6 +243,14 @@ export function AllocationCard({
           {format(new Date(allocation.scheduled_pickup), 'h:mm a')}
         </span>
       </div>
+
+      {/* Estimated Distance */}
+      {allocation.request?.estimated_distance_km != null && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+          <Route className="h-3 w-3" />
+          <span>{allocation.request.estimated_distance_km} km</span>
+        </div>
+      )}
 
       {/* Vehicle & Driver / Hailing Service */}
       <div className="flex items-center justify-between pt-2 border-t">
