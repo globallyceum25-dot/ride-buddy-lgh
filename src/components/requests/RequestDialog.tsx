@@ -3,11 +3,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
+import { CalendarIcon, Plus, Trash2, Zap } from 'lucide-react';
 import { SortableStops } from '@/components/requests/SortableStops';
 import { LocationAutocomplete, Coordinates } from '@/components/shared/LocationAutocomplete';
 import { MileageDisplay } from '@/components/requests/MileageDisplay';
 import { useDistanceCalculation } from '@/hooks/useDistanceCalculation';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
@@ -48,7 +50,7 @@ import { Database } from '@/integrations/supabase/types';
 type TripType = Database['public']['Enums']['trip_type'];
 type RequestPriority = Database['public']['Enums']['request_priority'];
 
-const formSchema = z.object({
+const baseFormSchema = z.object({
   trip_type: z.enum(['one_way', 'round_trip', 'multi_stop'] as const),
   pickup_location: z.string().min(1, 'Pickup location is required'),
   pickup_datetime: z.date({
@@ -61,13 +63,19 @@ const formSchema = z.object({
   purpose: z.string().min(1, 'Purpose is required'),
   passenger_count: z.number().min(1, 'At least 1 passenger required'),
   priority: z.enum(['normal', 'urgent', 'vip'] as const),
-  approver_id: z.string().min(1, 'Approver is required'),
+  approver_id: z.string().optional(),
   special_requirements: z.string().optional(),
   cost_center: z.string().optional(),
   notes: z.string().optional(),
 });
 
-type FormValues = z.infer<typeof formSchema>;
+const normalFormSchema = baseFormSchema.extend({
+  approver_id: z.string().min(1, 'Approver is required'),
+});
+
+const immediateFormSchema = baseFormSchema;
+
+type FormValues = z.infer<typeof baseFormSchema>;
 
 interface Passenger {
   name: string;
@@ -86,8 +94,11 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
   const [pickupCoords, setPickupCoords] = useState<Coordinates | null>(null);
   const [dropoffCoords, setDropoffCoords] = useState<Coordinates | null>(null);
   const [stopCoords, setStopCoords] = useState<(Coordinates | null)[]>([]);
+  const [isImmediate, setIsImmediate] = useState(false);
   const createRequest = useCreateRequest();
   const { data: approvers = [], isLoading: loadingApprovers } = useApprovers();
+
+  const formSchema = isImmediate ? immediateFormSchema : normalFormSchema;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -173,13 +184,14 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
       purpose: values.purpose,
       passenger_count: values.passenger_count,
       priority: values.priority,
-      approver_id: values.approver_id,
+      approver_id: isImmediate ? undefined : values.approver_id,
       special_requirements: values.special_requirements || null,
       cost_center: values.cost_center || null,
       notes: values.notes || null,
       passengers: passengers.filter(p => p.name.trim()),
       stops: values.trip_type === 'multi_stop' ? stops.filter(s => s.trim()) : [],
       estimated_distance_km: distanceKm,
+      is_immediate: isImmediate,
     });
 
     form.reset();
@@ -188,6 +200,7 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
     setPickupCoords(null);
     setDropoffCoords(null);
     setStopCoords([]);
+    setIsImmediate(false);
     onOpenChange(false);
   };
 
@@ -203,6 +216,32 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            {/* Immediate Request Toggle */}
+            <div className="flex items-center justify-between rounded-lg border border-border p-4 bg-muted/30">
+              <div className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-amber-500" />
+                <div>
+                  <Label htmlFor="immediate-toggle" className="text-sm font-medium cursor-pointer">
+                    Immediate Request
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Skip approval — goes directly to coordinators for allocation
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="immediate-toggle"
+                checked={isImmediate}
+                onCheckedChange={(checked) => {
+                  setIsImmediate(checked);
+                  if (checked) {
+                    form.setValue('approver_id', '');
+                    form.clearErrors('approver_id');
+                  }
+                }}
+              />
+            </div>
+
             {/* Trip Details Section */}
             <div className="space-y-4">
               <h3 className="text-sm font-medium text-muted-foreground">Trip Details</h3>
@@ -508,39 +547,41 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="approver_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Approver</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an approver" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {loadingApprovers ? (
-                          <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading...</div>
-                        ) : approvers.length === 0 ? (
-                          <div className="px-2 py-1.5 text-sm text-muted-foreground">No approvers available</div>
-                        ) : (
-                          approvers.map((approver) => (
-                            <SelectItem key={approver.user_id} value={approver.user_id}>
-                              {approver.full_name} ({approver.email})
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Select a manager to approve this request
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {!isImmediate && (
+                <FormField
+                  control={form.control}
+                  name="approver_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Approver</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an approver" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {loadingApprovers ? (
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground">Loading...</div>
+                          ) : approvers.length === 0 ? (
+                            <div className="px-2 py-1.5 text-sm text-muted-foreground">No approvers available</div>
+                          ) : (
+                            approvers.map((approver) => (
+                              <SelectItem key={approver.user_id} value={approver.user_id}>
+                                {approver.full_name} ({approver.email})
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Select a manager to approve this request
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField
@@ -602,7 +643,7 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
                 Cancel
               </Button>
               <Button type="submit" disabled={createRequest.isPending}>
-                {createRequest.isPending ? 'Submitting...' : 'Submit Request'}
+                {createRequest.isPending ? 'Submitting...' : isImmediate ? 'Submit for Immediate Allocation' : 'Submit Request'}
               </Button>
             </DialogFooter>
           </form>
