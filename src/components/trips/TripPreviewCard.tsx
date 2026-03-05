@@ -69,11 +69,13 @@ export function TripPreviewCard({
             <div className="flex-1 space-y-4">
               <div>
                 <p className="text-xs text-muted-foreground">Pickup</p>
-                <p className="text-sm font-medium line-clamp-1">{trip.pickup}</p>
+                {trip.pickupName && <p className="text-sm font-medium line-clamp-1">{trip.pickupName}</p>}
+                <p className={cn("text-sm line-clamp-1", trip.pickupName ? "text-xs text-muted-foreground" : "font-medium")}>{trip.pickup}</p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Drop-off</p>
-                <p className="text-sm font-medium line-clamp-1">{trip.dropoff}</p>
+                {trip.dropoffName && <p className="text-sm font-medium line-clamp-1">{trip.dropoffName}</p>}
+                <p className={cn("text-sm line-clamp-1", trip.dropoffName ? "text-xs text-muted-foreground" : "font-medium")}>{trip.dropoff}</p>
               </div>
             </div>
           </div>
@@ -181,7 +183,7 @@ export function TripBlock({ trip, onClick, onStartTrip, onCompleteTrip }: TripBl
           )}
         </div>
         <p className="text-xs truncate mt-0.5">
-          {trip.pickup} → {trip.dropoff}
+          {trip.pickupName || trip.pickup} → {trip.dropoffName || trip.dropoff}
         </p>
         {trip.vehicle && (
           <p className="text-[10px] text-muted-foreground mt-0.5 truncate">

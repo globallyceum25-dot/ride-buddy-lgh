@@ -21,6 +21,8 @@ export interface ScheduledTrip {
   status: AllocationStatus;
   pickup: string;
   dropoff: string;
+  pickupName: string | null;
+  dropoffName: string | null;
   passengerCount: number;
   vehicle: { id: string; registration: string; makeModel: string } | null;
   driver: { id: string; userId: string; name: string } | null;
@@ -69,6 +71,7 @@ export function useTripSchedule(filters: TripScheduleFilters) {
           *,
           request:travel_requests(
             id, request_number, purpose, pickup_location, dropoff_location,
+            pickup_location_name, dropoff_location_name,
             pickup_datetime, passenger_count, priority, status, requester_id
           ),
           vehicle:vehicles(id, registration_number, make, model, capacity, odometer),
@@ -170,6 +173,8 @@ export function useTripSchedule(filters: TripScheduleFilters) {
           status: allocation.status as AllocationStatus,
           pickup: allocation.request?.pickup_location || '',
           dropoff: allocation.request?.dropoff_location || '',
+          pickupName: allocation.request?.pickup_location_name || null,
+          dropoffName: allocation.request?.dropoff_location_name || null,
           passengerCount: allocation.request?.passenger_count || 1,
           vehicle: allocation.vehicle ? {
             id: allocation.vehicle.id,
@@ -307,6 +312,8 @@ export interface MonthTripPreview {
   time: string;
   pickup: string;
   dropoff: string;
+  pickupName: string | null;
+  dropoffName: string | null;
   status: AllocationStatus;
   vehicleReg: string | null;
   driverName: string | null;
@@ -348,6 +355,8 @@ export function useMonthSchedule(monthDate: Date) {
           request:travel_requests(
             pickup_location,
             dropoff_location,
+            pickup_location_name,
+            dropoff_location_name,
             passenger_count
           ),
           vehicle:vehicles(registration_number),
@@ -409,6 +418,8 @@ export function useMonthSchedule(monthDate: Date) {
           time: format(new Date(allocation.scheduled_pickup), 'HH:mm'),
           pickup: allocation.request?.pickup_location || 'Unknown',
           dropoff: allocation.request?.dropoff_location || 'Unknown',
+          pickupName: allocation.request?.pickup_location_name || null,
+          dropoffName: allocation.request?.dropoff_location_name || null,
           status: allocation.status as AllocationStatus,
           vehicleReg: allocation.vehicle?.registration_number || null,
           driverName: driverProfile?.full_name || null,
@@ -438,6 +449,7 @@ export function useWeekTrips(weekStart: Date, filters: TripScheduleFilters = {})
           *,
           request:travel_requests(
             id, request_number, purpose, pickup_location, dropoff_location,
+            pickup_location_name, dropoff_location_name,
             pickup_datetime, passenger_count, priority, status, requester_id
           ),
           vehicle:vehicles(id, registration_number, make, model, capacity, odometer),
@@ -526,6 +538,8 @@ export function useWeekTrips(weekStart: Date, filters: TripScheduleFilters = {})
           status: allocation.status as AllocationStatus,
           pickup: allocation.request?.pickup_location || '',
           dropoff: allocation.request?.dropoff_location || '',
+          pickupName: allocation.request?.pickup_location_name || null,
+          dropoffName: allocation.request?.dropoff_location_name || null,
           passengerCount: allocation.request?.passenger_count || 1,
           vehicle: allocation.vehicle ? {
             id: allocation.vehicle.id,
