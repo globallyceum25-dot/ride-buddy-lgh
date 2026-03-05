@@ -15,7 +15,7 @@ interface Prediction {
 
 interface LocationAutocompleteProps {
   value: string;
-  onChange: (value: string, coords: Coordinates | null) => void;
+  onChange: (value: string, coords: Coordinates | null, placeName?: string) => void;
   placeholder?: string;
   className?: string;
 }
@@ -116,15 +116,16 @@ export function LocationAutocomplete({
     setResults([]);
 
     placesServiceRef.current.getDetails(
-      { placeId: prediction.placeId, fields: ['geometry', 'formatted_address'] },
+      { placeId: prediction.placeId, fields: ['geometry', 'formatted_address', 'name'] },
       (place, status) => {
         if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
           const displayName = place.formatted_address || prediction.description;
+          const placeName = place.name || undefined;
           setQuery(displayName);
           onChange(displayName, {
             lat: place.geometry.location.lat(),
             lng: place.geometry.location.lng(),
-          });
+          }, placeName);
         } else {
           onChange(prediction.description, null);
         }

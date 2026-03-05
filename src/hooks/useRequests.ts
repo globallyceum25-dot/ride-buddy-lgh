@@ -17,8 +17,10 @@ export interface TravelRequest {
   purpose: string;
   passenger_count: number;
   pickup_location: string;
+  pickup_location_name: string | null;
   pickup_datetime: string;
   dropoff_location: string;
+  dropoff_location_name: string | null;
   return_datetime: string | null;
   special_requirements: string | null;
   cost_center: string | null;
@@ -75,6 +77,7 @@ export interface RequestStop {
   id: string;
   request_id: string;
   location: string;
+  location_name: string | null;
   stop_order: number;
   created_at: string;
 }
@@ -84,8 +87,10 @@ export interface CreateRequestInput {
   purpose: string;
   passenger_count: number;
   pickup_location: string;
+  pickup_location_name?: string;
   pickup_datetime: string;
   dropoff_location: string;
+  dropoff_location_name?: string;
   return_datetime?: string | null;
   special_requirements?: string | null;
   cost_center?: string | null;
@@ -94,6 +99,7 @@ export interface CreateRequestInput {
   notes?: string | null;
   passengers?: { name: string; phone?: string; is_primary?: boolean }[];
   stops?: string[];
+  stop_names?: (string | undefined)[];
   estimated_distance_km?: number | null;
   is_immediate?: boolean;
 }
@@ -363,7 +369,7 @@ export function useCreateRequest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { passengers, stops, estimated_distance_km, is_immediate, ...requestData } = input;
+      const { passengers, stops, stop_names, estimated_distance_km, is_immediate, pickup_location_name, dropoff_location_name, ...requestData } = input;
 
       const status = is_immediate ? 'approved' : 'pending_approval';
 
@@ -376,6 +382,8 @@ export function useCreateRequest() {
           requester_id: user.id,
           status,
           estimated_distance_km: estimated_distance_km ?? null,
+          pickup_location_name: pickup_location_name || null,
+          dropoff_location_name: dropoff_location_name || null,
           ...(is_immediate ? { approved_at: new Date().toISOString() } : {}),
         } as any)
         .select()
@@ -407,6 +415,7 @@ export function useCreateRequest() {
             stops.map((location, index) => ({
               request_id: request.id,
               location,
+              location_name: stop_names?.[index] || null,
               stop_order: index + 1,
             }))
           );
