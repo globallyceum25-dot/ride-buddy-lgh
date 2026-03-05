@@ -1,25 +1,45 @@
 
 
-# Show Estimated Distance in Request Detail Dialog and Reports
+# Add Leaflet Route Map Preview to Request Detail Dialog
 
-## Changes
+## Problem
+Coordinates are not stored in the database — only location names are saved. To show a map, we need to geocode the location names at display time.
 
-### 1. Add `estimated_distance_km` to `TravelRequest` interface
-- Add `estimated_distance_km: number | null` to the interface in `useRequests.ts` (line ~38, before `requester?`)
+## Approach
+1. Install `leaflet` and `react-leaflet` (free, OSM-based)
+2. Create a `RouteMapPreview` component that:
+   - Takes pickup, dropoff, and optional intermediate stop location names
+   - Geocodes them via Nominatim (same API already used in the app)
+   - Fetches the route geometry from OSRM with `overview=full&geometries=geojson`
+   - Renders a Leaflet map with markers and the route polyline
+   - Auto-fits bounds to show all waypoints
+3. Add `RouteMapPreview` to `RequestDetailDialog.tsx` after the estimated distance row, inside the Trip Details section
+4. The map only renders when location names are available; shows a small loading state while geocoding
 
-### 2. Show distance in `RequestDetailDialog.tsx`
-- After the destination row (line ~153), add a conditional row showing estimated distance when `estimated_distance_km` is not null
-- Uses `Route` icon from lucide-react, displays value as "X km"
+## New Dependencies
+- `leaflet` + `@types/leaflet`
+- `react-leaflet`
 
-### 3. Add distance column to the Requests table in `Requests.tsx`
-- Add an "Est. Distance" column to the table showing `estimated_distance_km` with "km" suffix, or "—" if null
+## Files
 
-### 4. Add distance data to Location Report
-- Update `useLocationReport` in `useReportData.ts` to also fetch `estimated_distance_km` from `travel_requests` and include total/average distance in `LocationReportItem` and route items
-- Update `LocationReport.tsx` to show distance column in the routes table
-- Update location CSV export to include distance
+### New: `src/components/requests/RouteMapPreview.tsx`
+- Props: `pickup: string`, `dropoff: string`, `stops?: string[]`
+- Internal state: geocoded coordinates, route geometry, loading/error
+- On mount: geocode all locations via Nominatim, then fetch OSRM route with `overview=full&geometries=geojson`
+- Render: `MapContainer` with `TileLayer` (OSM), `Marker` for each point (colored: green=pickup, red=dropoff, blue=stops), `GeoJSON` or `Polyline` for the route
+- Height: ~250px, rounded corners, contained within the dialog
 
-### 5. Add distance to Vehicle Report
-- Update `useVehicleReport` to also join `travel_requests.estimated_distance_km` and sum estimated distances alongside odometer-based distances
-- Show "Est. Distance" as an additional column or use it as fallback when odometer data is missing
+### Modified: `src/components/requests/RequestDetailDialog.tsx`
+- Import and render `RouteMapPreview` after the estimated distance row (around line 164)
+- Pass `pickup_location`, `dropoff_location`, and stops array
+
+### New: `src/index.css` addition
+- Add Leaflet CSS import: `@import 'leaflet/dist/leaflet.css';`
+- Fix default marker icon issue (known Leaflet+webpack/vite bug) by setting icon paths
+
+## Technical Notes
+- Nominatim geocoding is rate-limited (1 req/sec), so requests are sequential with small delays
+- The map is read-only (no interaction needed beyond zoom/pan)
+- Route polyline color: blue, matching standard map conventions
+- Leaflet's default marker icons need a manual fix in Vite environments (missing icon URLs)
 
