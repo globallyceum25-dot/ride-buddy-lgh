@@ -89,12 +89,13 @@ export interface CreateRequestInput {
   return_datetime?: string | null;
   special_requirements?: string | null;
   cost_center?: string | null;
-  approver_id: string;
+  approver_id?: string;
   priority?: RequestPriority;
   notes?: string | null;
   passengers?: { name: string; phone?: string; is_primary?: boolean }[];
   stops?: string[];
   estimated_distance_km?: number | null;
+  is_immediate?: boolean;
 }
 
 // Helper function to fetch profiles for a list of user IDs
@@ -362,16 +363,20 @@ export function useCreateRequest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { passengers, stops, estimated_distance_km, ...requestData } = input;
+      const { passengers, stops, estimated_distance_km, is_immediate, ...requestData } = input;
+
+      const status = is_immediate ? 'approved' : 'pending_approval';
 
       // Create the request
       const { data: request, error: requestError } = await supabase
         .from('travel_requests')
         .insert({
           ...requestData,
+          approver_id: is_immediate ? null : requestData.approver_id,
           requester_id: user.id,
-          status: 'pending_approval',
+          status,
           estimated_distance_km: estimated_distance_km ?? null,
+          ...(is_immediate ? { approved_at: new Date().toISOString() } : {}),
         } as any)
         .select()
         .single();
@@ -412,21 +417,45 @@ export function useCreateRequest() {
       // Log creation in history
       await supabase.from('request_history').insert({
         request_id: request.id,
-        action: 'Request created',
-        to_status: 'pending_approval',
+        action: is_immediate ? 'Immediate request created' : 'Request created',
+        to_status: status,
         performed_by: user.id,
       });
 
-      // Fire-and-forget: notify approver
-      if (request.approver_id) {
-        (async () => {
-          try {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('full_name')
-              .eq('user_id', user.id)
-              .single();
+      // Fire-and-forget: send notifications
+      (async () => {
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('user_id', user.id)
+            .single();
 
+          if (is_immediate) {
+            // Notify all location coordinators
+            const { data: coordinatorRoles } = await supabase
+              .from('user_roles')
+              .select('user_id')
+              .eq('role', 'location_coordinator');
+
+            if (coordinatorRoles && coordinatorRoles.length > 0) {
+              for (const coord of coordinatorRoles) {
+                await supabase.functions.invoke('send-notification', {
+                  body: {
+                    recipientUserId: coord.user_id,
+                    type: 'immediate_allocation',
+                    details: {
+                      requestNumber: request.request_number || 'N/A',
+                      route: `${request.pickup_location} → ${request.dropoff_location}`,
+                      pickupDatetime: request.pickup_datetime,
+                      requesterName: profile?.full_name || 'Unknown',
+                      purpose: request.purpose,
+                    },
+                  },
+                });
+              }
+            }
+          } else if (request.approver_id) {
             await supabase.functions.invoke('send-notification', {
               body: {
                 recipientUserId: request.approver_id,
@@ -440,19 +469,21 @@ export function useCreateRequest() {
                 },
               },
             });
-          } catch (e) {
-            console.error('Failed to send approval notification:', e);
           }
-        })();
-      }
+        } catch (e) {
+          console.error('Failed to send notification:', e);
+        }
+      })();
 
-      return request;
+      return { ...request, is_immediate };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['my-requests'] });
       toast({
-        title: 'Request Created',
-        description: 'Your travel request has been submitted for approval.',
+        title: data.is_immediate ? 'Immediate Request Submitted' : 'Request Created',
+        description: data.is_immediate
+          ? 'Your request has been sent directly to transport coordinators for allocation.'
+          : 'Your travel request has been submitted for approval.',
       });
     },
     onError: (error) => {
