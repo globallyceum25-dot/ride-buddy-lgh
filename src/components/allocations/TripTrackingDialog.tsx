@@ -170,7 +170,7 @@ export function TripTrackingDialog({
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" />
-              {allocation.request?.pickup_location} → {allocation.request?.dropoff_location}
+              {allocation.request?.pickup_location_name || allocation.request?.pickup_location} → {allocation.request?.dropoff_location_name || allocation.request?.dropoff_location}
             </div>
             {mode === 'complete' && allocation.actual_pickup && !isHailingService && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">

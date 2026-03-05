@@ -84,7 +84,7 @@ export function RescheduleRequestDialog({ request, open, onOpenChange }: Resched
         <DialogHeader>
           <DialogTitle>Reschedule Request</DialogTitle>
           <DialogDescription>
-            {request?.request_number} — {request?.pickup_location} → {request?.dropoff_location}
+            {request?.request_number} — {request?.pickup_location_name || request?.pickup_location} → {request?.dropoff_location_name || request?.dropoff_location}
           </DialogDescription>
         </DialogHeader>
 
