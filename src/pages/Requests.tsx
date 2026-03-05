@@ -220,6 +220,7 @@ export default function Requests() {
                       <TableHead>Route</TableHead>
                       <TableHead>Date</TableHead>
                       <TableHead>Approver</TableHead>
+                      <TableHead>Est. Distance</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -253,6 +254,11 @@ export default function Requests() {
                           {request.approver?.full_name || (
                             <span className="text-muted-foreground">—</span>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          {request.estimated_distance_km != null
+                            ? `${request.estimated_distance_km} km`
+                            : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell>
                           <RequestStatusBadge status={request.status} />

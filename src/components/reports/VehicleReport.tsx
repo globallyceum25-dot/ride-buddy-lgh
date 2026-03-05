@@ -119,6 +119,7 @@ export function VehicleReport({ data, isLoading }: VehicleReportProps) {
                 <TableHead className="text-right">Completed</TableHead>
                 <TableHead className="text-right">Cancelled</TableHead>
                 <TableHead className="text-right">Distance (km)</TableHead>
+                <TableHead className="text-right">Est. Distance (km)</TableHead>
                 <TableHead className="text-right">Avg Passengers</TableHead>
               </TableRow>
             </TableHeader>
@@ -133,6 +134,8 @@ export function VehicleReport({ data, isLoading }: VehicleReportProps) {
                   <TableCell className="text-right">{item.completedTrips}</TableCell>
                   <TableCell className="text-right">{item.cancelledTrips}</TableCell>
                   <TableCell className="text-right">{item.totalDistance.toLocaleString()}</TableCell>
+                  <TableCell className="text-right">{item.estimatedDistance ? Math.round(item.estimatedDistance).toLocaleString() : '—'}</TableCell>
+                  <TableCell className="text-right">{item.avgPassengers.toFixed(1)}</TableCell>
                   <TableCell className="text-right">{item.avgPassengers.toFixed(1)}</TableCell>
                 </TableRow>
               ))}

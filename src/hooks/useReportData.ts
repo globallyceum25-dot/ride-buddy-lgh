@@ -17,6 +17,7 @@ export interface VehicleReportItem {
   completedTrips: number;
   cancelledTrips: number;
   totalDistance: number;
+  estimatedDistance: number;
   avgPassengers: number;
 }
 
@@ -64,6 +65,8 @@ export interface RouteReportItem {
   pickup: string;
   dropoff: string;
   count: number;
+  totalDistance: number;
+  avgDistance: number;
 }
 
 export interface LocationReportData {
@@ -117,7 +120,8 @@ export function useVehicleReport(filters: ReportFilters) {
             model
           ),
           travel_requests (
-            passenger_count
+            passenger_count,
+            estimated_distance_km
           )
         `)
         .gte('scheduled_pickup', filters.startDate)
@@ -148,6 +152,7 @@ export function useVehicleReport(filters: ReportFilters) {
           completedTrips: 0,
           cancelledTrips: 0,
           totalDistance: 0,
+          estimatedDistance: 0,
           avgPassengers: 0,
         };
 
@@ -159,6 +164,7 @@ export function useVehicleReport(filters: ReportFilters) {
         existing.totalDistance += Math.max(0, distance);
         
         const passengers = allocation.travel_requests?.passenger_count || 0;
+        existing.estimatedDistance += allocation.travel_requests?.estimated_distance_km || 0;
         existing.avgPassengers = (existing.avgPassengers * (existing.totalTrips - 1) + passengers) / existing.totalTrips;
 
         vehicleMap.set(allocation.vehicle_id, existing);
@@ -287,7 +293,8 @@ export function useLocationReport(filters: ReportFilters) {
           id,
           pickup_location,
           dropoff_location,
-          status
+          status,
+          estimated_distance_km
         `)
         .gte('pickup_datetime', filters.startDate)
         .lte('pickup_datetime', filters.endDate + 'T23:59:59')
@@ -323,7 +330,7 @@ export function useLocationReport(filters: ReportFilters) {
 
       // Count trips by location
       const locationStats = new Map<string, { asOrigin: number; asDestination: number }>();
-      const routeStats = new Map<string, number>();
+      const routeStats = new Map<string, { count: number; totalDistance: number }>();
 
       filteredRequests.forEach((request) => {
         // Origin stats
@@ -338,7 +345,10 @@ export function useLocationReport(filters: ReportFilters) {
 
         // Route stats
         const routeKey = `${request.pickup_location}→${request.dropoff_location}`;
-        routeStats.set(routeKey, (routeStats.get(routeKey) || 0) + 1);
+        const existing = routeStats.get(routeKey) || { count: 0, totalDistance: 0 };
+        existing.count += 1;
+        existing.totalDistance += request.estimated_distance_km || 0;
+        routeStats.set(routeKey, existing);
       });
 
       const items: LocationReportItem[] = Array.from(locationStats.entries()).map(([name, stats]) => {
@@ -354,9 +364,15 @@ export function useLocationReport(filters: ReportFilters) {
       }).sort((a, b) => b.totalTrips - a.totalTrips);
 
       const routes: RouteReportItem[] = Array.from(routeStats.entries())
-        .map(([key, count]) => {
+        .map(([key, stats]) => {
           const [pickup, dropoff] = key.split('→');
-          return { pickup, dropoff, count };
+          return {
+            pickup,
+            dropoff,
+            count: stats.count,
+            totalDistance: Math.round(stats.totalDistance * 10) / 10,
+            avgDistance: stats.count > 0 ? Math.round((stats.totalDistance / stats.count) * 10) / 10 : 0,
+          };
         })
         .sort((a, b) => b.count - a.count)
         .slice(0, 10);
