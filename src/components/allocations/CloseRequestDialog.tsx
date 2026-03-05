@@ -20,6 +20,8 @@ interface CloseRequestDialogProps {
     request_number: string;
     pickup_location: string;
     dropoff_location: string;
+    pickup_location_name?: string | null;
+    dropoff_location_name?: string | null;
     status: string;
   } | null;
   open: boolean;
@@ -64,7 +66,7 @@ export function CloseRequestDialog({ request, open, onOpenChange }: CloseRequest
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            <strong>{request?.request_number}</strong> — {request?.pickup_location} → {request?.dropoff_location}
+            <strong>{request?.request_number}</strong> — {request?.pickup_location_name || request?.pickup_location} → {request?.dropoff_location_name || request?.dropoff_location}
           </AlertDescription>
         </Alert>
 

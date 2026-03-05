@@ -41,6 +41,8 @@ export interface Allocation {
     purpose: string;
     pickup_location: string;
     dropoff_location: string;
+    pickup_location_name?: string | null;
+    dropoff_location_name?: string | null;
     pickup_datetime: string;
     passenger_count: number;
     priority: string;
@@ -175,6 +177,7 @@ export function useAllocations(filters?: { status?: AllocationStatus; date?: str
           *,
           request:travel_requests(
             id, request_number, purpose, pickup_location, dropoff_location,
+            pickup_location_name, dropoff_location_name,
             pickup_datetime, passenger_count, priority, status, requester_id, estimated_distance_km
           ),
           vehicle:vehicles(id, registration_number, make, model, capacity, odometer),
@@ -260,6 +263,7 @@ export function useTripPools(filters?: { status?: PoolStatus }) {
           *,
           request:travel_requests(
             id, request_number, purpose, pickup_location, dropoff_location,
+            pickup_location_name, dropoff_location_name,
             pickup_datetime, passenger_count, requester_id
           )
         `)

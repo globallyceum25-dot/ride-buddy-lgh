@@ -40,6 +40,8 @@ interface Request {
   purpose: string;
   pickup_location: string;
   dropoff_location: string;
+  pickup_location_name?: string | null;
+  dropoff_location_name?: string | null;
   pickup_datetime: string;
   passenger_count: number;
   priority: string;
@@ -230,7 +232,7 @@ export function MergeRequestsDialog({ open, onOpenChange, requests }: MergeReque
                   </span>
                 </div>
                 <div className="text-muted-foreground">
-                  {request.pickup_location} → {request.dropoff_location}
+                  {request.pickup_location_name || request.pickup_location} → {request.dropoff_location_name || request.dropoff_location}
                 </div>
                 <div className="text-muted-foreground">
                   {request.requester?.full_name}
