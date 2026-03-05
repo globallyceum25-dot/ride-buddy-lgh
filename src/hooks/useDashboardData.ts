@@ -298,6 +298,49 @@ export function usePendingApprovalsCount() {
   });
 }
 
+export interface HailingSpendStats {
+  thisMonthSpend: number;
+  lastMonthSpend: number;
+  tripCount: number;
+  percentChange: number;
+}
+
+export function useHailingSpendStats() {
+  return useQuery({
+    queryKey: ['hailing-spend-stats'],
+    queryFn: async (): Promise<HailingSpendStats> => {
+      const now = new Date();
+      const thisMonthStart = format(startOfMonth(now), 'yyyy-MM-dd');
+      const lastMonthStart = format(startOfMonth(subMonths(now, 1)), 'yyyy-MM-dd');
+      const lastMonthEnd = thisMonthStart;
+
+      const [thisMonth, lastMonth] = await Promise.all([
+        supabase
+          .from('allocations')
+          .select('fare_amount')
+          .not('hailing_service', 'is', null)
+          .gte('scheduled_pickup', thisMonthStart),
+        supabase
+          .from('allocations')
+          .select('fare_amount')
+          .not('hailing_service', 'is', null)
+          .gte('scheduled_pickup', lastMonthStart)
+          .lt('scheduled_pickup', lastMonthEnd),
+      ]);
+
+      const thisMonthSpend = (thisMonth.data || []).reduce((sum, a) => sum + (a.fare_amount || 0), 0);
+      const tripCount = (thisMonth.data || []).length;
+      const lastMonthSpend = (lastMonth.data || []).reduce((sum, a) => sum + (a.fare_amount || 0), 0);
+      const percentChange = lastMonthSpend > 0
+        ? Math.round(((thisMonthSpend - lastMonthSpend) / lastMonthSpend) * 100)
+        : 0;
+
+      return { thisMonthSpend, lastMonthSpend, tripCount, percentChange };
+    },
+    staleTime: 60000,
+  });
+}
+
 export function useDriverTodayTrips() {
   const { user } = useAuth();
   
