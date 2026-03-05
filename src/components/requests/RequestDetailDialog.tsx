@@ -20,7 +20,8 @@ import {
   Mail,
   Phone,
   BadgeCheck,
-  Circle
+  Circle,
+  Route
 } from 'lucide-react';
 import { RequestStatusBadge } from './RequestStatusBadge';
 import { RequestPriorityBadge } from './RequestPriorityBadge';
@@ -151,6 +152,16 @@ export function RequestDetailDialog({
                       <p className="text-sm text-muted-foreground">{request.dropoff_location}</p>
                     </div>
                   </div>
+
+                  {request.estimated_distance_km != null && (
+                    <div className="flex items-start gap-3">
+                      <Route className="h-4 w-4 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium">Estimated Distance</p>
+                        <p className="text-sm text-muted-foreground">{request.estimated_distance_km} km</p>
+                      </div>
+                    </div>
+                  )}
 
                   {request.trip_type === 'round_trip' && request.return_datetime && (
                     <div className="flex items-start gap-3">

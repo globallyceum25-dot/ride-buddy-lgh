@@ -124,6 +124,8 @@ export function LocationReport({ data, isLoading }: LocationReportProps) {
                 <TableHead></TableHead>
                 <TableHead>Dropoff</TableHead>
                 <TableHead className="text-right">Trips</TableHead>
+                <TableHead className="text-right">Total Dist. (km)</TableHead>
+                <TableHead className="text-right">Avg Dist. (km)</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -135,6 +137,8 @@ export function LocationReport({ data, isLoading }: LocationReportProps) {
                   </TableCell>
                   <TableCell>{route.dropoff}</TableCell>
                   <TableCell className="text-right">{route.count}</TableCell>
+                  <TableCell className="text-right">{route.totalDistance || '—'}</TableCell>
+                  <TableCell className="text-right">{route.avgDistance || '—'}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

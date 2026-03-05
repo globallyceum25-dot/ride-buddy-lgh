@@ -36,6 +36,7 @@ export interface TravelRequest {
   guest_phone: string | null;
   guest_employee_id: string | null;
   form_link_id: string | null;
+  estimated_distance_km: number | null;
   requester?: {
     full_name: string;
     email: string;
