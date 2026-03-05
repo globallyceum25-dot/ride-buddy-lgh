@@ -8,12 +8,15 @@ import { VehicleReport } from '@/components/reports/VehicleReport';
 import { DriverReport } from '@/components/reports/DriverReport';
 import { LocationReport } from '@/components/reports/LocationReport';
 import { DepartmentReport } from '@/components/reports/DepartmentReport';
+import { HailingCostReport } from '@/components/reports/HailingCostReport';
 import {
   useVehicleReport,
   useDriverReport,
   useLocationReport,
   useDepartmentReport,
+  useHailingCostReport,
   ReportFilters as ReportFiltersType,
+  type HailingCostReportData,
 } from '@/hooks/useReportData';
 
 export default function Reports() {
@@ -21,6 +24,7 @@ export default function Reports() {
   const [filters, setFilters] = useState<ReportFiltersType>({
     startDate: format(startOfMonth(today), 'yyyy-MM-dd'),
     endDate: format(endOfMonth(today), 'yyyy-MM-dd'),
+    tripType: 'all',
   });
   const [activeTab, setActiveTab] = useState('vehicle');
 
@@ -28,6 +32,7 @@ export default function Reports() {
   const driverReport = useDriverReport(filters);
   const locationReport = useLocationReport(filters);
   const departmentReport = useDepartmentReport(filters);
+  const hailingCostReport = useHailingCostReport(filters);
 
   const handleExport = () => {
     let csvData = '';
@@ -56,6 +61,12 @@ export default function Reports() {
         if (departmentReport.data) {
           csvData = generateDepartmentCSV(departmentReport.data);
           filename = `department-report-${filters.startDate}-to-${filters.endDate}.csv`;
+        }
+        break;
+      case 'hailing':
+        if (hailingCostReport.data) {
+          csvData = generateHailingCSV(hailingCostReport.data);
+          filename = `hailing-cost-report-${filters.startDate}-to-${filters.endDate}.csv`;
         }
         break;
     }
@@ -87,16 +98,19 @@ export default function Reports() {
           endDate={filters.endDate}
           onStartDateChange={(date) => setFilters((f) => ({ ...f, startDate: date }))}
           onEndDateChange={(date) => setFilters((f) => ({ ...f, endDate: date }))}
+          tripType={filters.tripType}
+          onTripTypeChange={(value) => setFilters((f) => ({ ...f, tripType: value }))}
           onExport={handleExport}
         />
 
         {/* Report Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full overflow-x-auto flex-nowrap sm:grid sm:grid-cols-4 lg:w-[500px]">
+          <TabsList className="w-full overflow-x-auto flex-nowrap sm:grid sm:grid-cols-5 lg:w-[620px]">
             <TabsTrigger value="vehicle">Vehicle</TabsTrigger>
             <TabsTrigger value="driver">Driver</TabsTrigger>
             <TabsTrigger value="location">Location</TabsTrigger>
             <TabsTrigger value="department">Department</TabsTrigger>
+            <TabsTrigger value="hailing">Hailing Costs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="vehicle" className="mt-6">
@@ -113,6 +127,10 @@ export default function Reports() {
 
           <TabsContent value="department" className="mt-6">
             <DepartmentReport data={departmentReport.data} isLoading={departmentReport.isLoading} />
+          </TabsContent>
+
+          <TabsContent value="hailing" className="mt-6">
+            <HailingCostReport data={hailingCostReport.data} isLoading={hailingCostReport.isLoading} />
           </TabsContent>
         </Tabs>
       </div>
@@ -176,6 +194,19 @@ function generateDepartmentCSV(data: ReturnType<typeof useDepartmentReport>['dat
     item.pendingRequests,
     item.totalPassengers,
     item.avgPassengers.toFixed(1),
+  ]);
+  return [headers, ...rows].map((row) => row.join(',')).join('\n');
+}
+
+function generateHailingCSV(data: HailingCostReportData) {
+  const providerLabels: Record<string, string> = { pickme: 'PickMe', uber: 'Uber', personal: 'Personal' };
+  const headers = ['Provider', 'Trips', 'Total Fare (LKR)', 'Avg Fare (LKR)', 'Receipts'];
+  const rows = data.items.map((item) => [
+    providerLabels[item.provider] || item.provider,
+    item.tripCount,
+    item.totalFare,
+    Math.round(item.avgFare),
+    item.receiptsCount,
   ]);
   return [headers, ...rows].map((row) => row.join(',')).join('\n');
 }
