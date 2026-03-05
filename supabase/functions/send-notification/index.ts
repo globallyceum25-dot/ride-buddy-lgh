@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface NotificationPayload {
   recipientUserId: string;
-  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned" | "trip_dispatched" | "trip_in_progress" | "approval_requested";
+  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned" | "trip_dispatched" | "trip_in_progress" | "approval_requested" | "immediate_allocation";
   details: {
     requestNumber: string;
     route: string;
@@ -97,6 +97,15 @@ Deno.serve(async (req) => {
           })
         : "TBD";
       bodyText = `A new travel request ${details.requestNumber} requires your approval.\n\nRoute: ${details.route}\nRequester: ${details.requesterName || "N/A"}\nPickup: ${pickupStr}\nPurpose: ${details.purpose || "N/A"}`;
+    } else if (type === "immediate_allocation") {
+      subject = `Travel Request ${details.requestNumber} - Immediate Allocation Required`;
+      const pickupStr = details.pickupDatetime
+        ? new Date(details.pickupDatetime).toLocaleString("en-US", {
+            dateStyle: "long",
+            timeStyle: "short",
+          })
+        : "TBD";
+      bodyText = `An immediate travel request ${details.requestNumber} requires allocation.\n\nRoute: ${details.route}\nRequester: ${details.requesterName || "N/A"}\nPickup: ${pickupStr}\nPurpose: ${details.purpose || "N/A"}`;
     } else {
       const isClose = type === "overdue_closed";
       const actionLabel = isClose ? "Closed" : "Rescheduled";
@@ -166,6 +175,9 @@ Deno.serve(async (req) => {
         } else if (type === "approval_requested") {
           const pickupStr = details.pickupDatetime ? new Date(details.pickupDatetime).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" }) : "TBD";
           telegramText = `<b>📋 ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Requester:</b> ${details.requesterName || "N/A"}\n<b>Pickup:</b> ${pickupStr}\n<b>Purpose:</b> ${details.purpose || "N/A"}`;
+        } else if (type === "immediate_allocation") {
+          const pickupStr = details.pickupDatetime ? new Date(details.pickupDatetime).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" }) : "TBD";
+          telegramText = `<b>⚡ ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Requester:</b> ${details.requesterName || "N/A"}\n<b>Pickup:</b> ${pickupStr}\n<b>Purpose:</b> ${details.purpose || "N/A"}`;
         } else {
           telegramText = `<b>🚗 ${subject}</b>\n\n${bodyText}`;
         }
