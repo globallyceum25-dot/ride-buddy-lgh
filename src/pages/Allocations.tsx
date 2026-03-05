@@ -34,7 +34,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { 
   usePendingAllocation, useAllocations, useTripPools,
   useUpdateAllocationStatus, useCancelAllocation,
-  checkPoolCompatibility, Allocation
+  checkPoolCompatibility, Allocation, HAILING_SERVICE_LABELS
 } from '@/hooks/useAllocations';
 
 export default function Allocations() {
@@ -165,14 +165,23 @@ export default function Allocations() {
               <span className="font-semibold text-sm">{allocation.request?.request_number}</span>
               <AllocationStatusBadge status={allocation.status} />
             </div>
-            <p className="text-sm">{allocation.vehicle?.registration_number}
-              <span className="text-muted-foreground text-xs ml-1">
-                {allocation.vehicle?.make} {allocation.vehicle?.model}
-              </span>
+            <p className="text-sm">
+              {allocation.hailing_service ? (
+                <Badge variant="secondary">{HAILING_SERVICE_LABELS[allocation.hailing_service]}</Badge>
+              ) : (
+                <>
+                  {allocation.vehicle?.registration_number}
+                  <span className="text-muted-foreground text-xs ml-1">
+                    {allocation.vehicle?.make} {allocation.vehicle?.model}
+                  </span>
+                </>
+              )}
             </p>
-            <p className="text-sm text-muted-foreground">
-              Driver: {(allocation as any).driverProfile?.full_name || '—'}
-            </p>
+            {!allocation.hailing_service && (
+              <p className="text-sm text-muted-foreground">
+                Driver: {(allocation as any).driverProfile?.full_name || '—'}
+              </p>
+            )}
             <RouteDisplay 
               pickup={allocation.request?.pickup_location || ''} 
               destination={allocation.request?.dropoff_location || ''}
@@ -517,13 +526,21 @@ export default function Allocations() {
                           <TableRow key={allocation.id}>
                             <TableCell className="font-medium">{allocation.request?.request_number}</TableCell>
                             <TableCell>
-                              {allocation.vehicle?.registration_number}
-                              <br />
-                              <span className="text-muted-foreground text-xs">
-                                {allocation.vehicle?.make} {allocation.vehicle?.model}
-                              </span>
+                              {allocation.hailing_service ? (
+                                <Badge variant="secondary">{HAILING_SERVICE_LABELS[allocation.hailing_service]}</Badge>
+                              ) : (
+                                <>
+                                  {allocation.vehicle?.registration_number}
+                                  <br />
+                                  <span className="text-muted-foreground text-xs">
+                                    {allocation.vehicle?.make} {allocation.vehicle?.model}
+                                  </span>
+                                </>
+                              )}
                             </TableCell>
-                            <TableCell>{(allocation as any).driverProfile?.full_name || '—'}</TableCell>
+                            <TableCell>
+                              {allocation.hailing_service ? '—' : ((allocation as any).driverProfile?.full_name || '—')}
+                            </TableCell>
                             <TableCell>
                               <RouteDisplay 
                                 pickup={allocation.request?.pickup_location || ''} 

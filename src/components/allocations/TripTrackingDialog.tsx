@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Car, Gauge, MapPin, Clock, Users } from 'lucide-react';
+import { Car, Gauge, MapPin, Clock, Users, Navigation } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Allocation } from '@/hooks/useAllocations';
+import { Allocation, HAILING_SERVICE_LABELS } from '@/hooks/useAllocations';
 
 interface TripTrackingDialogProps {
   open: boolean;
@@ -50,10 +50,21 @@ export function TripTrackingDialog({
     }
   }, [open]);
 
+  const isHailingService = !!allocation?.hailing_service;
   const vehicleLastOdometer = allocation?.vehicle?.odometer || 0;
   const odometerStart = allocation?.odometer_start || 0;
 
   const handleSubmit = () => {
+    // For hailing service, skip odometer validation
+    if (isHailingService) {
+      if (mode === 'start') {
+        onSubmit({ actual_pickup: new Date().toISOString() });
+      } else {
+        onSubmit({ actual_dropoff: new Date().toISOString() });
+      }
+      return;
+    }
+
     const odometerValue = parseInt(odometer, 10);
     
     if (isNaN(odometerValue) || odometerValue <= 0) {
@@ -134,15 +145,24 @@ export function TripTrackingDialog({
               )}
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Car className="h-4 w-4" />
-              {allocation.vehicle?.registration_number}
-              {allocation.vehicle?.make && ` (${allocation.vehicle.make} ${allocation.vehicle.model})`}
+              {allocation.hailing_service ? (
+                <>
+                  <Navigation className="h-4 w-4" />
+                  {HAILING_SERVICE_LABELS[allocation.hailing_service]}
+                </>
+              ) : (
+                <>
+                  <Car className="h-4 w-4" />
+                  {allocation.vehicle?.registration_number}
+                  {allocation.vehicle?.make && ` (${allocation.vehicle.make} ${allocation.vehicle.model})`}
+                </>
+              )}
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" />
               {allocation.request?.pickup_location} → {allocation.request?.dropoff_location}
             </div>
-            {mode === 'complete' && allocation.actual_pickup && (
+            {mode === 'complete' && allocation.actual_pickup && !isHailingService && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />
                 Started: {format(new Date(allocation.actual_pickup), 'MMM d, h:mm a')} ({odometerStart.toLocaleString()} km)
@@ -151,7 +171,7 @@ export function TripTrackingDialog({
           </div>
 
           {/* Pooled Trip Notice */}
-          {isPooledTrip && (
+          {isPooledTrip && !isHailingService && (
             <div className="rounded-lg border border-info/50 bg-info/10 p-3">
               <p className="text-sm text-info-foreground">
                 <Users className="h-4 w-4 inline mr-1" />
@@ -160,41 +180,55 @@ export function TripTrackingDialog({
             </div>
           )}
 
-          {/* Odometer Input */}
-          <div className="space-y-2">
-            <Label htmlFor="odometer">
-              {mode === 'start' ? 'Starting Odometer' : 'Ending Odometer'} *
-            </Label>
-            <div className="relative">
-              <Input
-                id="odometer"
-                type="number"
-                placeholder="Enter odometer reading"
-                value={odometer}
-                onChange={(e) => {
-                  setOdometer(e.target.value);
-                  setError('');
-                }}
-                className={error ? 'border-destructive' : ''}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                km
-              </span>
-            </div>
-            {mode === 'start' && vehicleLastOdometer > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Last reading: {vehicleLastOdometer.toLocaleString()} km
+          {/* Hailing Service Notice */}
+          {isHailingService && (
+            <div className="rounded-lg border border-info/50 bg-info/10 p-3">
+              <p className="text-sm text-info-foreground">
+                <Navigation className="h-4 w-4 inline mr-1" />
+                This is a hailing service trip — no odometer tracking required.
               </p>
-            )}
-            {error && <p className="text-xs text-destructive">{error}</p>}
-          </div>
-
-          {/* Trip Distance (for completion) */}
-          {mode === 'complete' && tripDistance !== null && tripDistance > 0 && (
-            <div className="rounded-lg border p-3">
-              <p className="text-sm text-muted-foreground">Trip distance</p>
-              <p className="text-2xl font-bold">{tripDistance.toLocaleString()} km</p>
             </div>
+          )}
+
+          {/* Odometer Input - only for fleet vehicles */}
+          {!isHailingService && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="odometer">
+                  {mode === 'start' ? 'Starting Odometer' : 'Ending Odometer'} *
+                </Label>
+                <div className="relative">
+                  <Input
+                    id="odometer"
+                    type="number"
+                    placeholder="Enter odometer reading"
+                    value={odometer}
+                    onChange={(e) => {
+                      setOdometer(e.target.value);
+                      setError('');
+                    }}
+                    className={error ? 'border-destructive' : ''}
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                    km
+                  </span>
+                </div>
+                {mode === 'start' && vehicleLastOdometer > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Last reading: {vehicleLastOdometer.toLocaleString()} km
+                  </p>
+                )}
+                {error && <p className="text-xs text-destructive">{error}</p>}
+              </div>
+
+              {/* Trip Distance (for completion) */}
+              {mode === 'complete' && tripDistance !== null && tripDistance > 0 && (
+                <div className="rounded-lg border p-3">
+                  <p className="text-sm text-muted-foreground">Trip distance</p>
+                  <p className="text-2xl font-bold">{tripDistance.toLocaleString()} km</p>
+                </div>
+              )}
+            </>
           )}
 
           {/* Current Time */}

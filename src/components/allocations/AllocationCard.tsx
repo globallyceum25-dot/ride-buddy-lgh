@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
-import { Car, Clock, MapPin, User, MoreHorizontal, Play, CheckCircle, X, Users } from 'lucide-react';
+import { Car, Clock, MapPin, User, MoreHorizontal, Play, CheckCircle, X, Users, Navigation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Allocation } from '@/hooks/useAllocations';
+import { Allocation, HAILING_SERVICE_LABELS } from '@/hooks/useAllocations';
 
 interface AllocationCardProps {
   allocation: Allocation & {
@@ -235,18 +235,29 @@ export function AllocationCard({
         </span>
       </div>
 
-      {/* Vehicle & Driver */}
+      {/* Vehicle & Driver / Hailing Service */}
       <div className="flex items-center justify-between pt-2 border-t">
-        <div className="flex items-center gap-1.5 text-xs">
-          <Car className="h-3 w-3 text-muted-foreground" />
-          <span className="font-medium truncate max-w-[100px]">
-            {allocation.vehicle?.registration_number || 'No vehicle'}
-          </span>
-        </div>
-        {allocation.driverProfile && (
-          <span className="text-xs text-muted-foreground truncate max-w-[80px]">
-            {allocation.driverProfile.full_name}
-          </span>
+        {allocation.hailing_service ? (
+          <div className="flex items-center gap-1.5 text-xs">
+            <Navigation className="h-3 w-3 text-muted-foreground" />
+            <Badge variant="secondary" className="text-xs">
+              {HAILING_SERVICE_LABELS[allocation.hailing_service]}
+            </Badge>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5 text-xs">
+              <Car className="h-3 w-3 text-muted-foreground" />
+              <span className="font-medium truncate max-w-[100px]">
+                {allocation.vehicle?.registration_number || 'No vehicle'}
+              </span>
+            </div>
+            {allocation.driverProfile && (
+              <span className="text-xs text-muted-foreground truncate max-w-[80px]">
+                {allocation.driverProfile.full_name}
+              </span>
+            )}
+          </>
         )}
       </div>
     </div>

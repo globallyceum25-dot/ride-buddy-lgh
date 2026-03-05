@@ -6,12 +6,21 @@ import { useAuth } from '@/contexts/AuthContext';
 export type AllocationStatus = 'scheduled' | 'dispatched' | 'in_progress' | 'completed' | 'cancelled';
 export type PoolStatus = 'pending' | 'confirmed' | 'dispatched' | 'completed' | 'cancelled';
 
+export type HailingServiceType = 'pickme' | 'uber' | 'personal';
+
+export const HAILING_SERVICE_LABELS: Record<HailingServiceType, string> = {
+  pickme: '🚕 PickMe',
+  uber: '🚗 Uber',
+  personal: '🚙 Personal',
+};
+
 export interface Allocation {
   id: string;
   request_id: string;
   vehicle_id: string | null;
   driver_id: string | null;
   pool_id: string | null;
+  hailing_service: HailingServiceType | null;
   allocated_by: string | null;
   allocated_at: string | null;
   scheduled_pickup: string;
@@ -82,6 +91,7 @@ export interface AllocationInsert {
   vehicle_id?: string | null;
   driver_id?: string | null;
   pool_id?: string | null;
+  hailing_service?: HailingServiceType | null;
   scheduled_pickup: string;
   scheduled_dropoff?: string | null;
   notes?: string | null;
@@ -312,7 +322,9 @@ export function useCreateAllocation() {
           }
           
           if (request) {
-            const vehicleInfo = vehicle ? `${vehicle.registration_number} (${[vehicle.make, vehicle.model].filter(Boolean).join(' ')})` : "N/A";
+            const vehicleInfo = allocation.hailing_service 
+              ? HAILING_SERVICE_LABELS[allocation.hailing_service]
+              : vehicle ? `${vehicle.registration_number} (${[vehicle.make, vehicle.model].filter(Boolean).join(' ')})` : "N/A";
             await supabase.functions.invoke('send-notification', {
               body: {
                 recipientUserId: request.requester_id,
