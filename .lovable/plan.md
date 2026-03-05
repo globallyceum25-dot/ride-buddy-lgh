@@ -1,43 +1,49 @@
 
 
-# Replace Nominatim/OSRM with Google Maps APIs
+# Replace OpenStreetMap Stack with Google Maps APIs
 
 ## Overview
-Replace all OpenStreetMap-based services (Nominatim geocoding, OSRM routing) with Google Maps APIs (Places Autocomplete, Directions API, Maps JavaScript API). The Google API key will be stored as a publishable key in the codebase since it's a client-side key (restricted by HTTP referrer).
+Using your provided Google Maps API key (`AIzaSyBon2w3TBZg5vzd1pxGy0kZJ7THuyav5yo`), replace all Nominatim/OSRM/Leaflet usage with Google Maps APIs (Places Autocomplete, Directions, Maps JavaScript API).
 
-## Files affected
+## Changes
 
-### 1. `src/components/shared/LocationAutocomplete.tsx` — Replace Nominatim with Google Places Autocomplete
-- Remove Nominatim fetch logic
-- Use Google Places Autocomplete Service (`google.maps.places.AutocompleteService` + `PlacesService.getDetails`) for suggestions and coordinates
-- Keep the same component interface (`value`, `onChange` with coords, `placeholder`, `className`)
-- Filter results to Sri Lanka (`componentRestrictions: { country: 'lk' }`)
+### 1. `index.html` — Add Google Maps script
+Add before `</head>`:
+```html
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBon2w3TBZg5vzd1pxGy0kZJ7THuyav5yo&libraries=places" async defer></script>
+```
 
-### 2. `src/hooks/useDistanceCalculation.ts` — Replace OSRM with Google Directions API
-- Use `google.maps.DirectionsService` to calculate distance and duration between waypoints
-- Keep the same hook interface returning `{ distanceKm, durationMinutes, isLoading }`
+### 2. `src/index.css` — Remove Leaflet CSS
+Remove line 1: `@import 'leaflet/dist/leaflet.css';`
 
-### 3. `src/components/requests/RouteMapPreview.tsx` — Replace Leaflet + Nominatim + OSRM with Google Maps
-- Remove Leaflet/react-leaflet usage
-- Use Google Maps JavaScript API (`google.maps.Map`, `DirectionsRenderer`) to render the map and route
-- Keep the same component interface (`pickup`, `dropoff`, `stops`)
-- Use `DirectionsService` for routing (replaces both geocoding and OSRM)
+### 3. `src/components/shared/LocationAutocomplete.tsx` — Google Places Autocomplete
+- Remove Nominatim fetch logic entirely
+- Use `google.maps.places.AutocompleteService` for predictions (restricted to Sri Lanka)
+- Use `google.maps.places.PlacesService` with `getDetails` to get coordinates on selection
+- Keep same component interface (`value`, `onChange(value, coords)`, `placeholder`, `className`)
 
-### 4. `index.html` — Load Google Maps script
-- Add `<script src="https://maps.googleapis.com/maps/api/js?key=API_KEY&libraries=places"></script>` in `<head>`
-- The user will provide the API key
+### 4. `src/hooks/useDistanceCalculation.ts` — Google Directions API
+- Replace OSRM fetch with `google.maps.DirectionsService`
+- Convert waypoints to Google `DirectionsRequest` with origin, destination, and intermediate waypoints
+- Extract distance (km) and duration (minutes) from response legs
+- Keep same hook interface: `{ distanceKm, durationMinutes, isLoading }`
 
-### 5. `src/index.css` — Remove Leaflet CSS import
-- Remove `@import 'leaflet/dist/leaflet.css'` and any Leaflet marker fixes
+### 5. `src/components/requests/RouteMapPreview.tsx` — Google Maps + Directions
+- Remove all Leaflet/react-leaflet imports and marker icon setup
+- Use a `ref`-based `google.maps.Map` instance rendered in a plain `<div>`
+- Use `google.maps.DirectionsService` + `google.maps.DirectionsRenderer` to geocode location names and render the route with markers automatically
+- Keep same component interface: `pickup`, `dropoff`, `stops`
 
 ### 6. Cleanup
-- Can optionally remove `leaflet`, `@types/leaflet`, `react-leaflet` dependencies since they'll no longer be used
+- Remove `leaflet`, `@types/leaflet`, `react-leaflet` from `package.json` dependencies
 
-## Flow
-1. User provides Google Maps API key
-2. Add script tag to `index.html`
-3. Rewrite `LocationAutocomplete` to use Google Places
-4. Rewrite `useDistanceCalculation` to use Google Directions
-5. Rewrite `RouteMapPreview` to use Google Maps + Directions
-6. Remove Leaflet CSS and dependencies
+## Files summary
+| File | Action |
+|------|--------|
+| `index.html` | Add Google Maps script tag |
+| `src/index.css` | Remove Leaflet CSS import |
+| `src/components/shared/LocationAutocomplete.tsx` | Full rewrite — Google Places |
+| `src/hooks/useDistanceCalculation.ts` | Full rewrite — Google Directions |
+| `src/components/requests/RouteMapPreview.tsx` | Full rewrite — Google Maps |
+| `package.json` | Remove leaflet, @types/leaflet, react-leaflet |
 
