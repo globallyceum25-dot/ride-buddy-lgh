@@ -1,40 +1,46 @@
 
 
-# Add Cost Tracking for Hailing Service Trips
+# Add Fleet vs Hailing Service Filter and Cost Summary to Reports
 
-## Database Changes
+## Overview
+Add a "Trip Type" filter to the Reports page to distinguish fleet vehicle trips from hailing service trips, and introduce a new **Hailing Costs** summary section showing total spend by service provider.
 
-**Migration: Add cost tracking columns to `allocations` table**
-- `fare_amount` (numeric, nullable) -- the fare/cost amount
-- `receipt_reference` (text, nullable) -- booking or receipt reference number
+## Changes
 
-## UI Changes
+### 1. ReportFilters component (`src/components/reports/ReportFilters.tsx`)
+- Add a new `Select` dropdown: **Trip Type** with options: "All Trips", "Fleet Only", "Hailing Only"
+- Add new props: `tripType` and `onTripTypeChange`
 
-**AllocationDialog (`src/components/allocations/AllocationDialog.tsx`)**
-- When "Hailing Service" mode is selected, add two new fields below the service provider select:
-  - **Fare Amount** -- numeric input with currency prefix (e.g. "LKR")
-  - **Receipt Reference** -- text input for booking ID / receipt number
-- Both fields are optional at creation time (can be filled later)
-- Pass these values through to `useCreateAllocation`
+### 2. ReportFilters type (`src/hooks/useReportData.ts`)
+- Add `tripType?: 'all' | 'fleet' | 'hailing'` to `ReportFilters` interface
+- Update all four report hooks to filter allocations based on `tripType`:
+  - `fleet`: only where `hailing_service IS NULL`
+  - `hailing`: only where `hailing_service IS NOT NULL`
+  - `all`: no filter (default)
+- Add a new hook `useHailingCostReport(filters)` that queries allocations where `hailing_service IS NOT NULL`, aggregates by service provider, and returns:
+  - Per-provider: trip count, total fare, average fare
+  - Totals: total hailing trips, total cost, total with receipts
 
-**TripTrackingDialog (`src/components/allocations/TripTrackingDialog.tsx`)**
-- When completing a hailing service trip, show fare amount and receipt reference fields instead of odometer fields
-- Allow updating these values when marking a trip as completed
+### 3. New HailingCostReport component (`src/components/reports/HailingCostReport.tsx`)
+- Summary stat cards: Total Hailing Trips, Total Cost (LKR), Avg Cost per Trip
+- Bar chart: cost breakdown by provider (PickMe / Uber / Personal)
+- Table: provider name, trip count, total fare, average fare, receipts count
 
-**Allocations display (`src/pages/Allocations.tsx`, `AllocationCard.tsx`)**
-- Show fare amount and receipt reference on allocation cards/rows when present
-- Display as "LKR 1,500 • Ref: PK-123456" style badge or text line
+### 4. Reports page (`src/pages/Reports.tsx`)
+- Add `tripType` to filters state (default: `'all'`)
+- Pass `tripType`/`onTripTypeChange` to `ReportFilters`
+- Add a 5th tab: **Hailing Costs** using the new component
+- Update CSV export to handle the new tab
+- Update `TabsList` grid to `sm:grid-cols-5`
 
-## Hook Changes
-
-**`useAllocations.ts`**
-- Add `fare_amount` and `receipt_reference` to `Allocation` interface and `AllocationInsert` interface
-- Add these fields to `useUpdateAllocationStatus` mutation params so they can be set on trip completion
+### 5. Filter behavior
+- The trip type filter applies to Vehicle, Driver, Location, and Department tabs (filters the underlying allocation/request data)
+- The Hailing Costs tab always shows only hailing data regardless of the trip type filter
 
 ## Implementation Order
-1. Database migration
-2. Update hooks/interfaces
-3. Update AllocationDialog with cost fields
-4. Update TripTrackingDialog for hailing trip completion
-5. Update display components
+1. Update `ReportFilters` interface and filter component
+2. Update existing report hooks with trip type filtering
+3. Create `useHailingCostReport` hook
+4. Create `HailingCostReport` component
+5. Wire everything in `Reports.tsx`
 
