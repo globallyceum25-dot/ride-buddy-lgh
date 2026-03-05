@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { format, isPast } from 'date-fns';
 import { 
   Clock, Car, Users, Calendar, CheckCircle, FileText, MoreHorizontal,
-  Merge, Play, X, Gauge, AlertTriangle
+  Merge, Play, X, Gauge, AlertTriangle, Receipt
 } from 'lucide-react';
 import {
   Tooltip,
@@ -30,6 +30,7 @@ import { TripTrackingDialog } from '@/components/allocations/TripTrackingDialog'
 import { RouteDisplay } from '@/components/allocations/RouteDisplay';
 import { KanbanBoard } from '@/components/allocations/KanbanBoard';
 import { KanbanFilters, ViewMode } from '@/components/allocations/KanbanFilters';
+import { EditHailingCostDialog } from '@/components/allocations/EditHailingCostDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { 
   usePendingAllocation, useAllocations, useTripPools,
@@ -48,6 +49,7 @@ export default function Allocations() {
   const [trackingMode, setTrackingMode] = useState<'start' | 'complete'>('start');
   const [closeDialogRequest, setCloseDialogRequest] = useState<any>(null);
   const [rescheduleDialogRequest, setRescheduleDialogRequest] = useState<any>(null);
+  const [editCostAllocation, setEditCostAllocation] = useState<Allocation | null>(null);
 
   const isMobile = useIsMobile();
   const { data: pendingRequests = [], isLoading: loadingPending } = usePendingAllocation();
@@ -223,6 +225,11 @@ export default function Allocations() {
                   {['scheduled', 'dispatched'].includes(allocation.status) && (
                     <DropdownMenuItem onClick={() => cancelAllocation.mutate(allocation.id)} className="text-destructive">
                       <X className="h-4 w-4 mr-2" />Cancel
+                    </DropdownMenuItem>
+                  )}
+                  {allocation.hailing_service && (
+                    <DropdownMenuItem onClick={() => setEditCostAllocation(allocation)}>
+                      <Receipt className="h-4 w-4 mr-2" />Edit Cost
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -608,6 +615,11 @@ export default function Allocations() {
                                       <X className="h-4 w-4 mr-2" />Cancel
                                     </DropdownMenuItem>
                                   )}
+                                  {allocation.hailing_service && (
+                                    <DropdownMenuItem onClick={() => setEditCostAllocation(allocation)}>
+                                      <Receipt className="h-4 w-4 mr-2" />Edit Cost
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>
@@ -717,6 +729,15 @@ export default function Allocations() {
         open={!!rescheduleDialogRequest}
         onOpenChange={(open) => !open && setRescheduleDialogRequest(null)}
       />
+      {editCostAllocation && (
+        <EditHailingCostDialog
+          open={!!editCostAllocation}
+          onOpenChange={(open) => !open && setEditCostAllocation(null)}
+          allocationId={editCostAllocation.id}
+          currentFareAmount={editCostAllocation.fare_amount}
+          currentReceiptReference={editCostAllocation.receipt_reference}
+        />
+      )}
     </DashboardLayout>
   );
 }
