@@ -16,6 +16,8 @@ export interface MonthTripPreview {
   time: string;
   pickup: string;
   dropoff: string;
+  pickupName?: string | null;
+  dropoffName?: string | null;
   status: AllocationStatus;
   vehicleReg: string | null;
   driverName: string | null;
@@ -44,9 +46,14 @@ function TripPreviewRow({ trip }: { trip: MonthTripPreview }) {
           </Badge>
         )}
       </div>
-      <p className="text-sm truncate">
-        {trip.pickup} → {trip.dropoff}
+      <p className="text-sm truncate font-medium">
+        {trip.pickupName || trip.pickup} → {trip.dropoffName || trip.dropoff}
       </p>
+      {((trip.pickupName && trip.pickupName !== trip.pickup) || (trip.dropoffName && trip.dropoffName !== trip.dropoff)) && (
+        <p className="text-xs text-muted-foreground truncate">
+          {trip.pickup} → {trip.dropoff}
+        </p>
+      )}
       <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
         {trip.vehicleReg && (
           <span className="flex items-center gap-1">
