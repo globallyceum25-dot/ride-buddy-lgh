@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Eye, Edit, X, FileText } from 'lucide-react';
+import { Plus, Eye, Edit, X, FileText, Zap } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { RequestDialog } from '@/components/requests/RequestDialog';
 import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
 import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
@@ -83,6 +85,8 @@ export default function Requests() {
   const canCancel = (status: RequestStatus) => 
     !['cancelled', 'completed', 'in_progress', 'allocated'].includes(status);
 
+  const isImmediate = (r: TravelRequest) => !r.approver_id && r.status === 'approved';
+
   const renderMobileCards = () => (
     <div className="space-y-3">
       {filteredRequests.map((request) => (
@@ -93,6 +97,12 @@ export default function Requests() {
               <div className="flex items-center gap-1.5">
                 <RequestPriorityBadge priority={request.priority} />
                 <RequestStatusBadge status={request.status} />
+                {isImmediate(request) && (
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100 gap-1 px-1.5 py-0.5 text-[10px]">
+                    <Zap className="h-3 w-3" />
+                    Immediate
+                  </Badge>
+                )}
               </div>
             </div>
             <p className="text-sm text-muted-foreground truncate mb-1">{request.purpose}</p>
@@ -251,8 +261,15 @@ export default function Requests() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          {request.approver?.full_name || (
-                            <span className="text-muted-foreground">—</span>
+                          {isImmediate(request) ? (
+                            <Badge className="bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100 gap-1 px-1.5 py-0.5 text-xs">
+                              <Zap className="h-3 w-3" />
+                              Immediate
+                            </Badge>
+                          ) : (
+                            request.approver?.full_name || (
+                              <span className="text-muted-foreground">—</span>
+                            )
                           )}
                         </TableCell>
                         <TableCell>
@@ -261,7 +278,21 @@ export default function Requests() {
                             : <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell>
-                          <RequestStatusBadge status={request.status} />
+                          <div className="flex items-center gap-1.5">
+                            <RequestStatusBadge status={request.status} />
+                            {isImmediate(request) && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Zap className="h-3.5 w-3.5 text-amber-500" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Immediate request — skipped approval</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <RequestPriorityBadge priority={request.priority} />
