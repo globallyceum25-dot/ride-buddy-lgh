@@ -12,10 +12,12 @@ import {
   Users,
   Calendar,
   TrendingUp,
+  TrendingDown,
   Clock,
   AlertTriangle,
   Plus,
   ChevronRight,
+  Receipt,
 } from 'lucide-react';
 import { RequestDialog } from '@/components/requests/RequestDialog';
 import {
@@ -25,6 +27,7 @@ import {
   usePendingApprovalsPreview,
   usePendingApprovalsCount,
   useDriverTodayTrips,
+  useHailingSpendStats,
 } from '@/hooks/useDashboardData';
 import { format, formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -45,7 +48,7 @@ export default function Dashboard() {
   const { data: pendingApprovals = [], isLoading: approvalsLoading } = usePendingApprovalsPreview(3);
   const { data: pendingCount = 0 } = usePendingApprovalsCount();
   const { data: driverTrips = [], isLoading: tripsLoading } = useDriverTodayTrips();
-
+  const { data: hailingSpend, isLoading: hailingLoading } = useHailingSpendStats();
   const statsDisplay = [
     {
       label: 'Total Requests',
@@ -102,33 +105,80 @@ export default function Dashboard() {
 
         {/* Stats Grid - Show for admins/coordinators */}
         {isAdmin && (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {statsDisplay.map((stat) => (
-              <Card key={stat.label}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {stat.label}
-                  </CardTitle>
-                  <div className={stat.color}>{stat.icon}</div>
-                </CardHeader>
-                <CardContent>
-                  {statsLoading ? (
-                    <>
-                      <Skeleton className="h-8 w-16 mb-1" />
-                      <Skeleton className="h-4 w-24" />
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-2xl font-bold">{stat.value}</div>
-                      <p className="text-xs text-muted-foreground">{stat.change}</p>
-                    </>
-                  )}
+          <>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {statsDisplay.map((stat) => (
+                <Card key={stat.label}>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      {stat.label}
+                    </CardTitle>
+                    <div className={stat.color}>{stat.icon}</div>
+                  </CardHeader>
+                  <CardContent>
+                    {statsLoading ? (
+                      <>
+                        <Skeleton className="h-8 w-16 mb-1" />
+                        <Skeleton className="h-4 w-24" />
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-2xl font-bold">{stat.value}</div>
+                        <p className="text-xs text-muted-foreground">{stat.change}</p>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Hailing Service Spend Widget */}
+            {hailingLoading ? (
+              <Card>
+                <CardContent className="p-6">
+                  <Skeleton className="h-20 w-full" />
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            ) : hailingSpend && (hailingSpend.thisMonthSpend > 0 || hailingSpend.lastMonthSpend > 0) ? (
+              <Card 
+                className="cursor-pointer hover:shadow-md transition-shadow" 
+                onClick={() => navigate('/reports?tab=hailing')}
+              >
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium text-muted-foreground">Hailing Service Spend</p>
+                      <p className="text-2xl font-bold">
+                        LKR {hailingSpend.thisMonthSpend.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                      <div className="flex items-center gap-1.5 text-xs">
+                        {hailingSpend.percentChange !== 0 && (
+                          <span className={cn(
+                            'flex items-center gap-0.5 font-medium',
+                            hailingSpend.percentChange > 0 ? 'text-destructive' : 'text-emerald-600 dark:text-emerald-400'
+                          )}>
+                            {hailingSpend.percentChange > 0 ? (
+                              <TrendingUp className="h-3 w-3" />
+                            ) : (
+                              <TrendingDown className="h-3 w-3" />
+                            )}
+                            {Math.abs(hailingSpend.percentChange)}%
+                          </span>
+                        )}
+                        <span className="text-muted-foreground">
+                          {hailingSpend.tripCount} trip{hailingSpend.tripCount !== 1 ? 's' : ''} this month
+                        </span>
+                      </div>
+                    </div>
+                    <div className="rounded-full bg-primary/10 p-3">
+                      <Receipt className="h-5 w-5 text-primary" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+          </>
         )}
-
         {/* Role-specific content */}
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* Staff: Quick Actions */}
