@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { format } from 'date-fns';
-import { Car, Clock, MapPin, User, MoreHorizontal, Play, CheckCircle, X, Users, Navigation } from 'lucide-react';
+import { Car, Clock, MapPin, User, MoreHorizontal, Play, CheckCircle, X, Users, Navigation, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Allocation, HAILING_SERVICE_LABELS } from '@/hooks/useAllocations';
+import { EditHailingCostDialog } from './EditHailingCostDialog';
 
 interface AllocationCardProps {
   allocation: Allocation & {
@@ -54,6 +56,7 @@ export function AllocationCard({
   isPoolHighlighted = false,
   onPoolHover,
 }: AllocationCardProps) {
+  const [showEditCost, setShowEditCost] = useState(false);
   const {
     attributes,
     listeners,
@@ -165,6 +168,12 @@ export function AllocationCard({
                 Complete Trip
               </DropdownMenuItem>
             )}
+            {allocation.hailing_service && (
+              <DropdownMenuItem onClick={() => setShowEditCost(true)}>
+                <Receipt className="h-4 w-4 mr-2" />
+                Edit Cost
+              </DropdownMenuItem>
+            )}
             {allocation.status !== 'completed' && onCancel && (
               <DropdownMenuItem onClick={onCancel} className="text-destructive">
                 <X className="h-4 w-4 mr-2" />
@@ -269,6 +278,14 @@ export function AllocationCard({
           </>
         )}
       </div>
+
+      <EditHailingCostDialog
+        open={showEditCost}
+        onOpenChange={setShowEditCost}
+        allocationId={allocation.id}
+        currentFareAmount={allocation.fare_amount}
+        currentReceiptReference={allocation.receipt_reference}
+      />
     </div>
   );
 }

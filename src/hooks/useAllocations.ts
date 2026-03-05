@@ -708,6 +708,36 @@ export function useBulkUpdateAllocationStatus() {
   });
 }
 
+// Update hailing cost (fare amount & receipt reference)
+export function useUpdateHailingCost() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, fare_amount, receipt_reference }: {
+      id: string;
+      fare_amount: number | null;
+      receipt_reference: string | null;
+    }) => {
+      const { data, error } = await supabase
+        .from('allocations')
+        .update({ fare_amount, receipt_reference })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['allocations'] });
+      toast.success('Hailing cost updated');
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update hailing cost: ${error.message}`);
+    },
+  });
+}
+
 // Cancel allocation
 export function useCancelAllocation() {
   const queryClient = useQueryClient();
