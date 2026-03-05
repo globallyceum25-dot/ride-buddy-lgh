@@ -22,7 +22,7 @@ export function TripCard({ trip, onStartTrip, onCompleteTrip, compact = false }:
         <div className="flex items-center gap-3">
           <span className="font-medium text-sm">{formattedTime}</span>
           <span className="text-sm text-muted-foreground">
-            {trip.pickup} → {trip.dropoff}
+            {trip.pickupName || trip.pickup} → {trip.dropoffName || trip.dropoff}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -55,11 +55,15 @@ export function TripCard({ trip, onStartTrip, onCompleteTrip, compact = false }:
         </div>
 
         {/* Route */}
-        <div className="flex items-center gap-2 text-sm">
-          <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-muted-foreground">
-            {trip.pickup} → {trip.dropoff}
-          </span>
+        <div className="flex items-start gap-2 text-sm">
+          <MapPin className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="text-muted-foreground">
+            <span className="font-medium text-foreground">{trip.pickupName || trip.pickup}</span>
+            {trip.pickupName && <span className="block text-xs">{trip.pickup}</span>}
+            <span> → </span>
+            <span className="font-medium text-foreground">{trip.dropoffName || trip.dropoff}</span>
+            {trip.dropoffName && <span className="block text-xs">{trip.dropoff}</span>}
+          </div>
         </div>
 
         {/* Request Info */}

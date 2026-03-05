@@ -51,13 +51,19 @@ export function AgendaTripCard({
         
         {/* Route */}
         <div className="space-y-1">
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin className="h-4 w-4 text-success shrink-0" />
-            <span className="truncate">{trip.pickup}</span>
+          <div className="flex items-start gap-2 text-sm">
+            <MapPin className="h-4 w-4 text-success shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              {trip.pickupName && <span className="font-medium block truncate">{trip.pickupName}</span>}
+              <span className={cn("truncate block", trip.pickupName && "text-xs text-muted-foreground")}>{trip.pickup}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <MapPin className="h-4 w-4 text-destructive shrink-0" />
-            <span className="truncate">{trip.dropoff}</span>
+          <div className="flex items-start gap-2 text-sm">
+            <MapPin className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              {trip.dropoffName && <span className="font-medium block truncate">{trip.dropoffName}</span>}
+              <span className={cn("truncate block", trip.dropoffName && "text-xs text-muted-foreground")}>{trip.dropoff}</span>
+            </div>
           </div>
         </div>
         
