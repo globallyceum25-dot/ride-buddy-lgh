@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useGoogleMapsLoaded } from '@/hooks/useGoogleMapsLoaded';
 
 interface RouteMapPreviewProps {
   pickup: string;
@@ -13,11 +14,10 @@ export function RouteMapPreview({ pickup, dropoff, stops = [] }: RouteMapPreview
   const [error, setError] = useState<string | null>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
+  const mapsLoaded = useGoogleMapsLoaded();
 
   useEffect(() => {
-    if (!mapRef.current || typeof google === 'undefined' || !google.maps) {
-      setError('Google Maps not available');
-      setIsLoading(false);
+    if (!mapsLoaded || !mapRef.current) {
       return;
     }
 
@@ -67,9 +67,17 @@ export function RouteMapPreview({ pickup, dropoff, stops = [] }: RouteMapPreview
         setIsLoading(false);
       }
     );
-  }, [pickup, dropoff, stops.join('|')]);
+  }, [mapsLoaded, pickup, dropoff, stops.join('|')]);
 
-  if (error && !isLoading) {
+  if (!mapsLoaded || (isLoading && !error)) {
+    return (
+      <div className="relative w-full h-[250px] rounded-lg overflow-hidden border border-border">
+        <Skeleton className="absolute inset-0" />
+      </div>
+    );
+  }
+
+  if (error) {
     return (
       <div className="w-full h-[120px] rounded-lg bg-muted flex items-center justify-center">
         <p className="text-sm text-muted-foreground">{error}</p>
