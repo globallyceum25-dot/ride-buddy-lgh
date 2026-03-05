@@ -8,12 +8,9 @@ export interface Coordinates {
   lng: number;
 }
 
-interface NominatimResult {
-  place_id: number;
-  display_name: string;
-  lat: string;
-  lon: string;
-  type: string;
+interface Prediction {
+  placeId: string;
+  description: string;
 }
 
 interface LocationAutocompleteProps {
@@ -30,11 +27,25 @@ export function LocationAutocomplete({
   className,
 }: LocationAutocompleteProps) {
   const [query, setQuery] = useState(value);
-  const [results, setResults] = useState<NominatimResult[]>([]);
+  const [results, setResults] = useState<Prediction[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+  const dummyDivRef = useRef<HTMLDivElement | null>(null);
+
+  // Initialize Google services
+  useEffect(() => {
+    if (typeof google !== 'undefined' && google.maps?.places) {
+      autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
+      if (!dummyDivRef.current) {
+        dummyDivRef.current = document.createElement('div');
+      }
+      placesServiceRef.current = new google.maps.places.PlacesService(dummyDivRef.current);
+    }
+  }, []);
 
   // Sync external value changes
   useEffect(() => {
@@ -53,7 +64,7 @@ export function LocationAutocomplete({
   }, []);
 
   const searchLocations = useCallback(async (searchQuery: string) => {
-    if (searchQuery.length < 3) {
+    if (searchQuery.length < 3 || !autocompleteServiceRef.current) {
       setResults([]);
       setIsOpen(false);
       return;
@@ -61,20 +72,29 @@ export function LocationAutocomplete({
 
     setIsLoading(true);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=5&countrycodes=lk&addressdetails=1`,
+      autocompleteServiceRef.current.getPlacePredictions(
         {
-          headers: {
-            'User-Agent': 'FleetManagementApp/1.0',
-          },
+          input: searchQuery,
+          componentRestrictions: { country: 'lk' },
+        },
+        (predictions, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+            setResults(
+              predictions.map((p) => ({
+                placeId: p.place_id,
+                description: p.description,
+              }))
+            );
+            setIsOpen(true);
+          } else {
+            setResults([]);
+            setIsOpen(false);
+          }
+          setIsLoading(false);
         }
       );
-      const data: NominatimResult[] = await res.json();
-      setResults(data);
-      setIsOpen(data.length > 0);
     } catch {
       setResults([]);
-    } finally {
       setIsLoading(false);
     }
   }, []);
@@ -82,21 +102,34 @@ export function LocationAutocomplete({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setQuery(val);
-    onChange(val, null); // Clear coords when typing
+    onChange(val, null);
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => searchLocations(val), 300);
   };
 
-  const handleSelect = (result: NominatimResult) => {
-    const displayName = result.display_name;
-    setQuery(displayName);
-    onChange(displayName, {
-      lat: parseFloat(result.lat),
-      lng: parseFloat(result.lon),
-    });
+  const handleSelect = (prediction: Prediction) => {
+    if (!placesServiceRef.current) return;
+
+    setQuery(prediction.description);
     setIsOpen(false);
     setResults([]);
+
+    placesServiceRef.current.getDetails(
+      { placeId: prediction.placeId, fields: ['geometry', 'formatted_address'] },
+      (place, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
+          const displayName = place.formatted_address || prediction.description;
+          setQuery(displayName);
+          onChange(displayName, {
+            lat: place.geometry.location.lat(),
+            lng: place.geometry.location.lng(),
+          });
+        } else {
+          onChange(prediction.description, null);
+        }
+      }
+    );
   };
 
   return (
@@ -122,14 +155,14 @@ export function LocationAutocomplete({
         <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-lg max-h-60 overflow-y-auto">
           {results.map((result) => (
             <button
-              key={result.place_id}
+              key={result.placeId}
               type="button"
               className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground transition-colors border-b last:border-b-0 border-border/50"
               onClick={() => handleSelect(result)}
             >
               <div className="flex items-start gap-2">
                 <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
-                <span className="line-clamp-2">{result.display_name}</span>
+                <span className="line-clamp-2">{result.description}</span>
               </div>
             </button>
           ))}

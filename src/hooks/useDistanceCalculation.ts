@@ -14,9 +14,8 @@ export function useDistanceCalculation(waypoints: (Coordinates | null)[]): Dista
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    // Filter valid waypoints
     const validWaypoints = waypoints.filter((w): w is Coordinates => w !== null);
-    
+
     if (validWaypoints.length < 2) {
       setDistanceKm(null);
       setDurationMinutes(null);
@@ -25,38 +24,54 @@ export function useDistanceCalculation(waypoints: (Coordinates | null)[]): Dista
 
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    debounceRef.current = setTimeout(async () => {
+    debounceRef.current = setTimeout(() => {
+      if (typeof google === 'undefined' || !google.maps) return;
+
       setIsLoading(true);
-      try {
-        const coordsStr = validWaypoints
-          .map((w) => `${w.lng},${w.lat}`)
-          .join(';');
+      const service = new google.maps.DirectionsService();
 
-        const res = await fetch(
-          `https://router.project-osrm.org/route/v1/driving/${coordsStr}?overview=false`
-        );
-        const data = await res.json();
+      const origin = new google.maps.LatLng(validWaypoints[0].lat, validWaypoints[0].lng);
+      const destination = new google.maps.LatLng(
+        validWaypoints[validWaypoints.length - 1].lat,
+        validWaypoints[validWaypoints.length - 1].lng
+      );
 
-        if (data.code === 'Ok' && data.routes?.[0]) {
-          const route = data.routes[0];
-          setDistanceKm(Math.round((route.distance / 1000) * 10) / 10);
-          setDurationMinutes(Math.round(route.duration / 60));
-        } else {
-          setDistanceKm(null);
-          setDurationMinutes(null);
+      const intermediateWaypoints = validWaypoints.slice(1, -1).map((w) => ({
+        location: new google.maps.LatLng(w.lat, w.lng),
+        stopover: true,
+      }));
+
+      service.route(
+        {
+          origin,
+          destination,
+          waypoints: intermediateWaypoints,
+          travelMode: google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status === google.maps.DirectionsStatus.OK && result?.routes?.[0]) {
+            const legs = result.routes[0].legs;
+            let totalDistance = 0;
+            let totalDuration = 0;
+            for (const leg of legs) {
+              totalDistance += leg.distance?.value ?? 0;
+              totalDuration += leg.duration?.value ?? 0;
+            }
+            setDistanceKm(Math.round((totalDistance / 1000) * 10) / 10);
+            setDurationMinutes(Math.round(totalDuration / 60));
+          } else {
+            setDistanceKm(null);
+            setDurationMinutes(null);
+          }
+          setIsLoading(false);
         }
-      } catch {
-        setDistanceKm(null);
-        setDurationMinutes(null);
-      } finally {
-        setIsLoading(false);
-      }
+      );
     }, 500);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [waypoints.map((w) => w ? `${w.lat},${w.lng}` : 'null').join('|')]);
+  }, [waypoints.map((w) => (w ? `${w.lat},${w.lng}` : 'null')).join('|')]);
 
   return { distanceKm, durationMinutes, isLoading };
 }
