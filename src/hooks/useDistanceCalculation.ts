@@ -13,7 +13,7 @@ export function useDistanceCalculation(waypoints: (Coordinates | null)[]): Dista
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  const mapsLoaded = useGoogleMapsLoaded();
+  const { loaded: mapsLoaded } = useGoogleMapsLoaded();
 
   useEffect(() => {
     if (!mapsLoaded) return;

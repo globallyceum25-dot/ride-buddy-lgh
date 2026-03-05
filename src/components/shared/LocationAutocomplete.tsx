@@ -35,7 +35,7 @@ export function LocationAutocomplete({
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
   const dummyDivRef = useRef<HTMLDivElement | null>(null);
-  const mapsLoaded = useGoogleMapsLoaded();
+  const { loaded: mapsLoaded, timedOut } = useGoogleMapsLoaded();
 
   // Initialize Google services when loaded
   useEffect(() => {
@@ -139,9 +139,9 @@ export function LocationAutocomplete({
           value={query}
           onChange={handleInputChange}
           onFocus={() => results.length > 0 && setIsOpen(true)}
-          placeholder={!mapsLoaded ? 'Loading maps...' : placeholder}
-          className={cn('pr-8', className)}
-          disabled={!mapsLoaded}
+          placeholder={timedOut ? 'Maps failed to load' : !mapsLoaded ? 'Loading maps...' : placeholder}
+          className={cn('pr-8', timedOut && 'border-destructive', className)}
+          disabled={!mapsLoaded || timedOut}
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2">
           {!mapsLoaded || isLoading ? (

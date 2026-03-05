@@ -14,7 +14,7 @@ export function RouteMapPreview({ pickup, dropoff, stops = [] }: RouteMapPreview
   const [error, setError] = useState<string | null>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const rendererRef = useRef<google.maps.DirectionsRenderer | null>(null);
-  const mapsLoaded = useGoogleMapsLoaded();
+  const { loaded: mapsLoaded, timedOut } = useGoogleMapsLoaded();
 
   useEffect(() => {
     if (!mapsLoaded || !mapRef.current) {
@@ -68,6 +68,14 @@ export function RouteMapPreview({ pickup, dropoff, stops = [] }: RouteMapPreview
       }
     );
   }, [mapsLoaded, pickup, dropoff, stops.join('|')]);
+
+  if (timedOut) {
+    return (
+      <div className="w-full h-[120px] rounded-lg bg-destructive/10 border border-destructive/30 flex items-center justify-center">
+        <p className="text-sm text-destructive">Google Maps failed to load. Please check your connection and refresh the page.</p>
+      </div>
+    );
+  }
 
   if (!mapsLoaded || (isLoading && !error)) {
     return (
