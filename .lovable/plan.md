@@ -1,31 +1,26 @@
 
 
-# Edit Fare Amount and Receipt Reference After Allocation
+# Add Monthly Hailing Service Spend Widget to Dashboard
 
 ## Overview
-Add the ability to edit fare amount and receipt reference on existing hailing service allocations via a small dialog accessible from the allocation card's dropdown menu.
+Add a new dashboard card for admins showing this month's total hailing service spend, with a percentage trend compared to last month.
 
 ## Changes
 
-### 1. New mutation hook in `useAllocations.ts`
-- Add `useUpdateHailingCost()` mutation that updates only `fare_amount` and `receipt_reference` on an allocation by ID
-- Invalidates `allocations` query on success
+### 1. New hook: `useHailingSpendStats()` in `useDashboardData.ts`
+- Query `allocations` where `hailing_service IS NOT NULL` for current month and previous month
+- Sum `fare_amount` for each period
+- Return: `thisMonthSpend`, `lastMonthSpend`, `tripCount`, `percentChange`
 
-### 2. New `EditHailingCostDialog` component (`src/components/allocations/EditHailingCostDialog.tsx`)
-- Small dialog with two fields: Fare Amount (numeric input with LKR prefix) and Receipt Reference (text input)
-- Pre-populated with current values from the allocation
-- Save button calls `useUpdateHailingCost`
+### 2. New widget in `Dashboard.tsx`
+- Add a card in the admin stats grid area (below existing 4-stat row)
+- Shows: total hailing spend (LKR formatted), trip count, and trend badge (up/down arrow with % change vs last month)
+- Uses green/red coloring for trend direction
+- Only visible to admin users (`isAdmin`)
+- Links to Reports page Hailing Costs tab on click
 
-### 3. Update `AllocationCard.tsx`
-- Add an "Edit Cost" menu item in the dropdown menu, visible only when `hailing_service` is set
-- Opens the `EditHailingCostDialog`
-
-### 4. Update `Allocations.tsx` (table view)
-- Add an "Edit Cost" action for hailing allocations in the table/card view if applicable
-
-## Implementation Order
-1. Add mutation hook
-2. Create dialog component
-3. Wire into AllocationCard dropdown
-4. Wire into Allocations page table view
+### 3. Visual design
+- Compact card matching existing stat card style
+- Icon: `Banknote` or `Receipt` from lucide-react
+- Subtitle: "X trips this month" with trend indicator
 
