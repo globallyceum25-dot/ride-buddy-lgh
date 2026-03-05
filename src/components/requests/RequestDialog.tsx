@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { format } from 'date-fns';
 import { CalendarIcon, Plus, Trash2 } from 'lucide-react';
 import { SortableStops } from '@/components/requests/SortableStops';
+import { LocationAutocomplete, Coordinates } from '@/components/shared/LocationAutocomplete';
+import { MileageDisplay } from '@/components/requests/MileageDisplay';
+import { useDistanceCalculation } from '@/hooks/useDistanceCalculation';
 import {
   Dialog,
   DialogContent,
@@ -80,6 +83,9 @@ interface RequestDialogProps {
 export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
   const [passengers, setPassengers] = useState<Passenger[]>([]);
   const [stops, setStops] = useState<string[]>([]);
+  const [pickupCoords, setPickupCoords] = useState<Coordinates | null>(null);
+  const [dropoffCoords, setDropoffCoords] = useState<Coordinates | null>(null);
+  const [stopCoords, setStopCoords] = useState<(Coordinates | null)[]>([]);
   const createRequest = useCreateRequest();
   const { data: approvers = [], isLoading: loadingApprovers } = useApprovers();
 
@@ -103,7 +109,20 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
 
   const tripType = form.watch('trip_type');
 
-  // Stops management handled by SortableStops component
+  // Build waypoints for distance calculation
+  const waypoints = useMemo(() => {
+    if (tripType === 'multi_stop') {
+      return [pickupCoords, ...stopCoords, dropoffCoords];
+    }
+    return [pickupCoords, dropoffCoords];
+  }, [pickupCoords, dropoffCoords, stopCoords, tripType]);
+
+  const { distanceKm, durationMinutes, isLoading: distanceLoading } = useDistanceCalculation(waypoints);
+
+  const handleStopsChange = (newStops: string[], newCoords?: (Coordinates | null)[]) => {
+    setStops(newStops);
+    if (newCoords) setStopCoords(newCoords);
+  };
 
   const addPassenger = () => {
     setPassengers([...passengers, { name: '', phone: '', is_primary: passengers.length === 0 }]);
@@ -160,11 +179,15 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
       notes: values.notes || null,
       passengers: passengers.filter(p => p.name.trim()),
       stops: values.trip_type === 'multi_stop' ? stops.filter(s => s.trim()) : [],
+      estimated_distance_km: distanceKm,
     });
 
     form.reset();
     setPassengers([]);
     setStops([]);
+    setPickupCoords(null);
+    setDropoffCoords(null);
+    setStopCoords([]);
     onOpenChange(false);
   };
 
@@ -239,7 +262,14 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
                   <FormItem>
                     <FormLabel>Pickup Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter pickup address" {...field} />
+                      <LocationAutocomplete
+                        value={field.value}
+                        onChange={(val, coords) => {
+                          field.onChange(val);
+                          setPickupCoords(coords);
+                        }}
+                        placeholder="Search pickup address"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -304,7 +334,11 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
 
               {/* Intermediate Stops Section - shown only for multi_stop */}
               {tripType === 'multi_stop' && (
-                <SortableStops stops={stops} onStopsChange={setStops} />
+                <SortableStops
+                  stops={stops}
+                  onStopsChange={handleStopsChange}
+                  stopCoords={stopCoords}
+                />
               )}
 
               <FormField
@@ -314,11 +348,25 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
                   <FormItem>
                     <FormLabel>{tripType === 'multi_stop' ? 'Final Destination' : 'Dropoff Location'}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter destination address" {...field} />
+                      <LocationAutocomplete
+                        value={field.value}
+                        onChange={(val, coords) => {
+                          field.onChange(val);
+                          setDropoffCoords(coords);
+                        }}
+                        placeholder="Search destination address"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+
+              {/* Mileage Display */}
+              <MileageDisplay
+                distanceKm={distanceKm}
+                durationMinutes={durationMinutes}
+                isLoading={distanceLoading}
               />
 
               {tripType === 'round_trip' && (

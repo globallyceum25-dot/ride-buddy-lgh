@@ -93,6 +93,7 @@ export interface CreateRequestInput {
   notes?: string | null;
   passengers?: { name: string; phone?: string; is_primary?: boolean }[];
   stops?: string[];
+  estimated_distance_km?: number | null;
 }
 
 // Helper function to fetch profiles for a list of user IDs
@@ -360,7 +361,7 @@ export function useCreateRequest() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { passengers, stops, ...requestData } = input;
+      const { passengers, stops, estimated_distance_km, ...requestData } = input;
 
       // Create the request
       const { data: request, error: requestError } = await supabase
@@ -369,7 +370,8 @@ export function useCreateRequest() {
           ...requestData,
           requester_id: user.id,
           status: 'pending_approval',
-        })
+          estimated_distance_km: estimated_distance_km ?? null,
+        } as any)
         .select()
         .single();
 

@@ -18,17 +18,18 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { LocationAutocomplete, Coordinates } from '@/components/shared/LocationAutocomplete';
 
 interface SortableStopItemProps {
   id: string;
   index: number;
   value: string;
-  onChange: (value: string) => void;
+  coords: Coordinates | null;
+  onChange: (value: string, coords: Coordinates | null) => void;
   onRemove: () => void;
 }
 
-function SortableStopItem({ id, index, value, onChange, onRemove }: SortableStopItemProps) {
+function SortableStopItem({ id, index, value, coords, onChange, onRemove }: SortableStopItemProps) {
   const {
     attributes,
     listeners,
@@ -58,12 +59,13 @@ function SortableStopItem({ id, index, value, onChange, onRemove }: SortableStop
         <GripVertical className="h-4 w-4" />
       </button>
       <span className="text-sm text-muted-foreground w-12">Stop {index + 1}</span>
-      <Input
-        placeholder={`Enter stop ${index + 1} location`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="flex-1"
-      />
+      <div className="flex-1">
+        <LocationAutocomplete
+          value={value}
+          onChange={onChange}
+          placeholder={`Search stop ${index + 1} location`}
+        />
+      </div>
       <Button
         type="button"
         variant="ghost"
@@ -78,10 +80,11 @@ function SortableStopItem({ id, index, value, onChange, onRemove }: SortableStop
 
 interface SortableStopsProps {
   stops: string[];
-  onStopsChange: (stops: string[]) => void;
+  onStopsChange: (stops: string[], coords?: (Coordinates | null)[]) => void;
+  stopCoords?: (Coordinates | null)[];
 }
 
-export function SortableStops({ stops, onStopsChange }: SortableStopsProps) {
+export function SortableStops({ stops, onStopsChange, stopCoords = [] }: SortableStopsProps) {
   // Generate stable IDs for each stop
   const [stopIds] = useState<string[]>(() => 
     stops.map((_, i) => `stop-${i}-${Date.now()}`)
@@ -110,18 +113,24 @@ export function SortableStops({ stops, onStopsChange }: SortableStopsProps) {
 
   const addStop = () => {
     stopIds.push(`stop-${stopIds.length}-${Date.now()}`);
-    onStopsChange([...stops, '']);
+    const newCoords = [...stopCoords, null];
+    onStopsChange([...stops, ''], newCoords);
   };
 
   const removeStop = (index: number) => {
     stopIds.splice(index, 1);
-    onStopsChange(stops.filter((_, i) => i !== index));
+    const newStops = stops.filter((_, i) => i !== index);
+    const newCoords = stopCoords.filter((_, i) => i !== index);
+    onStopsChange(newStops, newCoords);
   };
 
-  const updateStop = (index: number, value: string) => {
-    const updated = [...stops];
-    updated[index] = value;
-    onStopsChange(updated);
+  const updateStop = (index: number, value: string, coords: Coordinates | null) => {
+    const updatedStops = [...stops];
+    updatedStops[index] = value;
+    const updatedCoords = [...stopCoords];
+    while (updatedCoords.length <= index) updatedCoords.push(null);
+    updatedCoords[index] = coords;
+    onStopsChange(updatedStops, updatedCoords);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -131,15 +140,14 @@ export function SortableStops({ stops, onStopsChange }: SortableStopsProps) {
       const oldIndex = currentIds.indexOf(active.id as string);
       const newIndex = currentIds.indexOf(over.id as string);
       
-      // Reorder both IDs and stops
       const newIds = arrayMove(currentIds, oldIndex, newIndex);
       const newStops = arrayMove(stops, oldIndex, newIndex);
+      const newCoords = arrayMove([...stopCoords], oldIndex, newIndex);
       
-      // Update the stopIds array in place
       stopIds.length = 0;
       stopIds.push(...newIds);
       
-      onStopsChange(newStops);
+      onStopsChange(newStops, newCoords);
     }
   };
 
@@ -170,7 +178,8 @@ export function SortableStops({ stops, onStopsChange }: SortableStopsProps) {
                   id={currentIds[index]}
                   index={index}
                   value={stop}
-                  onChange={(value) => updateStop(index, value)}
+                  coords={stopCoords[index] || null}
+                  onChange={(value, coords) => updateStop(index, value, coords)}
                   onRemove={() => removeStop(index)}
                 />
               ))}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,6 +6,9 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import { CalendarIcon, Car, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { SortableStops } from '@/components/requests/SortableStops';
+import { LocationAutocomplete, Coordinates } from '@/components/shared/LocationAutocomplete';
+import { MileageDisplay } from '@/components/requests/MileageDisplay';
+import { useDistanceCalculation } from '@/hooks/useDistanceCalculation';
 import { usePublicFormLink, useSubmitPublicRequest } from '@/hooks/usePublicRequest';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,12 +21,10 @@ import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 
 const formSchema = z.object({
-  // Guest info
   guest_name: z.string().min(2, 'Name must be at least 2 characters'),
   guest_employee_id: z.string().min(1, 'Employee ID is required'),
   guest_email: z.string().email('Please enter a valid email'),
   guest_phone: z.string().min(10, 'Phone number is required (min 10 digits)'),
-  // Trip details
   trip_type: z.enum(['one_way', 'round_trip', 'multi_stop']),
   pickup_location: z.string().min(3, 'Pickup location is required'),
   dropoff_location: z.string().min(3, 'Destination is required'),
@@ -46,6 +47,9 @@ export default function PublicRequestForm() {
   const [submitted, setSubmitted] = useState(false);
   const [requestNumber, setRequestNumber] = useState<string>('');
   const [stops, setStops] = useState<string[]>([]);
+  const [pickupCoords, setPickupCoords] = useState<Coordinates | null>(null);
+  const [dropoffCoords, setDropoffCoords] = useState<Coordinates | null>(null);
+  const [stopCoords, setStopCoords] = useState<(Coordinates | null)[]>([]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -68,7 +72,19 @@ export default function PublicRequestForm() {
 
   const tripType = form.watch('trip_type');
 
-  // Stops management handled by SortableStops component
+  const waypoints = useMemo(() => {
+    if (tripType === 'multi_stop') {
+      return [pickupCoords, ...stopCoords, dropoffCoords];
+    }
+    return [pickupCoords, dropoffCoords];
+  }, [pickupCoords, dropoffCoords, stopCoords, tripType]);
+
+  const { distanceKm, durationMinutes, isLoading: distanceLoading } = useDistanceCalculation(waypoints);
+
+  const handleStopsChange = (newStops: string[], newCoords?: (Coordinates | null)[]) => {
+    setStops(newStops);
+    if (newCoords) setStopCoords(newCoords);
+  };
 
   const onSubmit = async (values: FormValues) => {
     if (!token) return;
@@ -105,6 +121,7 @@ export default function PublicRequestForm() {
           special_requirements: values.special_requirements,
           notes: values.notes,
           stops: values.trip_type === 'multi_stop' ? stops.filter(s => s.trim()) : [],
+          estimated_distance_km: distanceKm,
         },
       });
       setRequestNumber(result.requestNumber);
@@ -162,7 +179,6 @@ export default function PublicRequestForm() {
   return (
     <div className="min-h-screen bg-muted/30 py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header */}
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2">
             <Car className="h-8 w-8 text-primary" />
@@ -277,7 +293,14 @@ export default function PublicRequestForm() {
                       <FormItem>
                         <FormLabel>Pickup Location *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter pickup address" {...field} />
+                          <LocationAutocomplete
+                            value={field.value}
+                            onChange={(val, coords) => {
+                              field.onChange(val);
+                              setPickupCoords(coords);
+                            }}
+                            placeholder="Search pickup address"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -290,7 +313,14 @@ export default function PublicRequestForm() {
                       <FormItem>
                         <FormLabel>{tripType === 'multi_stop' ? 'Final Destination *' : 'Destination *'}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter destination" {...field} />
+                          <LocationAutocomplete
+                            value={field.value}
+                            onChange={(val, coords) => {
+                              field.onChange(val);
+                              setDropoffCoords(coords);
+                            }}
+                            placeholder="Search destination"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -298,10 +328,21 @@ export default function PublicRequestForm() {
                   />
                 </div>
 
-                {/* Intermediate Stops Section - shown only for multi_stop */}
+                {/* Intermediate Stops */}
                 {tripType === 'multi_stop' && (
-                  <SortableStops stops={stops} onStopsChange={setStops} />
+                  <SortableStops
+                    stops={stops}
+                    onStopsChange={handleStopsChange}
+                    stopCoords={stopCoords}
+                  />
                 )}
+
+                {/* Mileage Display */}
+                <MileageDisplay
+                  distanceKm={distanceKm}
+                  durationMinutes={durationMinutes}
+                  isLoading={distanceLoading}
+                />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField

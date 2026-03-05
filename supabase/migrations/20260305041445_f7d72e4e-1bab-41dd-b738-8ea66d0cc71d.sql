@@ -1,0 +1,1 @@
+ALTER TABLE public.travel_requests ADD COLUMN estimated_distance_km numeric NULL;
