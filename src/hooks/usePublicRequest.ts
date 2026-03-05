@@ -20,6 +20,7 @@ interface RequestData {
   special_requirements?: string;
   notes?: string;
   stops?: string[];
+  estimated_distance_km?: number | null;
 }
 
 interface SubmitPublicRequestParams {

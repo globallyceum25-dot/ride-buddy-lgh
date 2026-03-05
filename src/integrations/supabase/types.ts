@@ -570,6 +570,7 @@ export type Database = {
           cost_center: string | null
           created_at: string
           dropoff_location: string
+          estimated_distance_km: number | null
           form_link_id: string | null
           guest_email: string | null
           guest_employee_id: string | null
@@ -599,6 +600,7 @@ export type Database = {
           cost_center?: string | null
           created_at?: string
           dropoff_location: string
+          estimated_distance_km?: number | null
           form_link_id?: string | null
           guest_email?: string | null
           guest_employee_id?: string | null
@@ -628,6 +630,7 @@ export type Database = {
           cost_center?: string | null
           created_at?: string
           dropoff_location?: string
+          estimated_distance_km?: number | null
           form_link_id?: string | null
           guest_email?: string | null
           guest_employee_id?: string | null
