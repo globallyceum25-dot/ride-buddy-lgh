@@ -26,6 +26,7 @@ import {
 import { RequestStatusBadge } from './RequestStatusBadge';
 import { RequestPriorityBadge } from './RequestPriorityBadge';
 import { useRequest, TravelRequest, RequestHistory } from '@/hooks/useRequests';
+import { RouteMapPreview } from './RouteMapPreview';
 
 interface RequestDetailDialogProps {
   open: boolean;
@@ -162,6 +163,13 @@ export function RequestDetailDialog({
                       </div>
                     </div>
                   )}
+
+                  {/* Route Map Preview */}
+                  <RouteMapPreview
+                    pickup={request.pickup_location}
+                    dropoff={request.dropoff_location}
+                    stops={stops.map(s => s.location)}
+                  />
 
                   {request.trip_type === 'round_trip' && request.return_datetime && (
                     <div className="flex items-start gap-3">
