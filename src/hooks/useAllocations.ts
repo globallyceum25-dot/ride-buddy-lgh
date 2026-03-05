@@ -312,7 +312,7 @@ export function useCreateAllocation() {
         try {
           // Fetch request details, vehicle info, and driver name
           const [requestRes, vehicleRes, driverRes] = await Promise.all([
-            supabase.from('travel_requests').select('request_number, pickup_location, dropoff_location, pickup_datetime, requester_id').eq('id', allocation.request_id).single(),
+            supabase.from('travel_requests').select('request_number, pickup_location, pickup_location_name, dropoff_location, dropoff_location_name, pickup_datetime, requester_id').eq('id', allocation.request_id).single(),
             allocation.vehicle_id ? supabase.from('vehicles').select('registration_number, make, model').eq('id', allocation.vehicle_id).single() : Promise.resolve({ data: null }),
             allocation.driver_id ? supabase.from('drivers').select('user_id').eq('id', allocation.driver_id).single() : Promise.resolve({ data: null }),
           ]);
@@ -336,7 +336,7 @@ export function useCreateAllocation() {
                 type: 'allocation_assigned',
                 details: {
                   requestNumber: request.request_number || 'N/A',
-                  route: `${request.pickup_location} → ${request.dropoff_location}`,
+                  route: `${request.pickup_location_name || request.pickup_location} → ${request.dropoff_location_name || request.dropoff_location}`,
                   vehicleInfo,
                   driverName,
                   pickupDatetime: request.pickup_datetime,
@@ -429,7 +429,7 @@ export function useCreateTripPool() {
         try {
           const { data: poolRequests } = await supabase
             .from('travel_requests')
-            .select('id, request_number, pickup_location, dropoff_location, pickup_datetime, requester_id')
+            .select('id, request_number, pickup_location, pickup_location_name, dropoff_location, dropoff_location_name, pickup_datetime, requester_id')
             .in('id', request_ids);
           
           let vehicleInfo = "N/A";
@@ -454,7 +454,7 @@ export function useCreateTripPool() {
                 type: 'allocation_assigned',
                 details: {
                   requestNumber: req.request_number || 'N/A',
-                  route: `${req.pickup_location} → ${req.dropoff_location}`,
+                  route: `${req.pickup_location_name || req.pickup_location} → ${req.dropoff_location_name || req.dropoff_location}`,
                   vehicleInfo,
                   driverName,
                   pickupDatetime: req.pickup_datetime,
@@ -539,7 +539,7 @@ export function useUpdateAllocationStatus() {
             const { data: allocation } = await supabase
               .from('allocations')
               .select(`
-                request:travel_requests(request_number, pickup_location, dropoff_location, pickup_datetime, requester_id),
+                request:travel_requests(request_number, pickup_location, pickup_location_name, dropoff_location, dropoff_location_name, pickup_datetime, requester_id),
                 vehicle:vehicles(registration_number, make, model),
                 driver:drivers(user_id)
               `)
@@ -564,7 +564,7 @@ export function useUpdateAllocationStatus() {
                 type: status === 'dispatched' ? 'trip_dispatched' : 'trip_in_progress',
                 details: {
                   requestNumber: request.request_number || 'N/A',
-                  route: `${request.pickup_location} → ${request.dropoff_location}`,
+                  route: `${request.pickup_location_name || request.pickup_location} → ${request.dropoff_location_name || request.dropoff_location}`,
                   vehicleInfo,
                   driverName,
                   pickupDatetime: request.pickup_datetime,
@@ -652,7 +652,7 @@ export function useBulkUpdateAllocationStatus() {
             const requestIds = data.map(a => a.request_id);
             const { data: requests } = await supabase
               .from('travel_requests')
-              .select('id, request_number, pickup_location, dropoff_location, pickup_datetime, requester_id')
+              .select('id, request_number, pickup_location, pickup_location_name, dropoff_location, dropoff_location_name, pickup_datetime, requester_id')
               .in('id', requestIds);
             
             // Fetch vehicle & driver info from first allocation
@@ -681,7 +681,7 @@ export function useBulkUpdateAllocationStatus() {
                   type: status === 'dispatched' ? 'trip_dispatched' : 'trip_in_progress',
                   details: {
                     requestNumber: req.request_number || 'N/A',
-                    route: `${req.pickup_location} → ${req.dropoff_location}`,
+                    route: `${req.pickup_location_name || req.pickup_location} → ${req.dropoff_location_name || req.dropoff_location}`,
                     vehicleInfo,
                     driverName,
                     pickupDatetime: req.pickup_datetime,
