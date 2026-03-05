@@ -91,9 +91,12 @@ interface RequestDialogProps {
 export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
   const [passengers, setPassengers] = useState<Passenger[]>([]);
   const [stops, setStops] = useState<string[]>([]);
+  const [stopNames, setStopNames] = useState<(string | undefined)[]>([]);
   const [pickupCoords, setPickupCoords] = useState<Coordinates | null>(null);
   const [dropoffCoords, setDropoffCoords] = useState<Coordinates | null>(null);
   const [stopCoords, setStopCoords] = useState<(Coordinates | null)[]>([]);
+  const [pickupLocationName, setPickupLocationName] = useState<string | undefined>();
+  const [dropoffLocationName, setDropoffLocationName] = useState<string | undefined>();
   const [isImmediate, setIsImmediate] = useState(false);
   const createRequest = useCreateRequest();
   const { data: approvers = [], isLoading: loadingApprovers } = useApprovers();
@@ -130,9 +133,10 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
 
   const { distanceKm, durationMinutes, isLoading: distanceLoading } = useDistanceCalculation(waypoints);
 
-  const handleStopsChange = (newStops: string[], newCoords?: (Coordinates | null)[]) => {
+  const handleStopsChange = (newStops: string[], newCoords?: (Coordinates | null)[], newNames?: (string | undefined)[]) => {
     setStops(newStops);
     if (newCoords) setStopCoords(newCoords);
+    if (newNames) setStopNames(newNames);
   };
 
   const addPassenger = () => {
@@ -178,8 +182,10 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
     await createRequest.mutateAsync({
       trip_type: values.trip_type,
       pickup_location: values.pickup_location,
+      pickup_location_name: pickupLocationName,
       pickup_datetime: pickupDatetime,
       dropoff_location: values.dropoff_location,
+      dropoff_location_name: dropoffLocationName,
       return_datetime: returnDatetime || null,
       purpose: values.purpose,
       passenger_count: values.passenger_count,
@@ -190,6 +196,7 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
       notes: values.notes || null,
       passengers: passengers.filter(p => p.name.trim()),
       stops: values.trip_type === 'multi_stop' ? stops.filter(s => s.trim()) : [],
+      stop_names: values.trip_type === 'multi_stop' ? stopNames : [],
       estimated_distance_km: distanceKm,
       is_immediate: isImmediate,
     });
@@ -197,9 +204,12 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
     form.reset();
     setPassengers([]);
     setStops([]);
+    setStopNames([]);
     setPickupCoords(null);
     setDropoffCoords(null);
     setStopCoords([]);
+    setPickupLocationName(undefined);
+    setDropoffLocationName(undefined);
     setIsImmediate(false);
     onOpenChange(false);
   };
@@ -303,9 +313,10 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
                     <FormControl>
                       <LocationAutocomplete
                         value={field.value}
-                        onChange={(val, coords) => {
+                        onChange={(val, coords, placeName) => {
                           field.onChange(val);
                           setPickupCoords(coords);
+                          setPickupLocationName(placeName);
                         }}
                         placeholder="Search pickup address"
                       />
@@ -377,6 +388,7 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
                   stops={stops}
                   onStopsChange={handleStopsChange}
                   stopCoords={stopCoords}
+                  stopNames={stopNames}
                 />
               )}
 
@@ -389,9 +401,10 @@ export function RequestDialog({ open, onOpenChange }: RequestDialogProps) {
                     <FormControl>
                       <LocationAutocomplete
                         value={field.value}
-                        onChange={(val, coords) => {
+                        onChange={(val, coords, placeName) => {
                           field.onChange(val);
                           setDropoffCoords(coords);
+                          setDropoffLocationName(placeName);
                         }}
                         placeholder="Search destination address"
                       />

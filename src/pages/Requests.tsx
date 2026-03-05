@@ -107,8 +107,8 @@ export default function Requests() {
             </div>
             <p className="text-sm text-muted-foreground truncate mb-1">{request.purpose}</p>
             <div className="text-sm mb-1">
-              <span>{request.pickup_location}</span>
-              <span className="text-muted-foreground"> → {request.dropoff_location}</span>
+              <span>{request.pickup_location_name || request.pickup_location}</span>
+              <span className="text-muted-foreground"> → {request.dropoff_location_name || request.dropoff_location}</span>
             </div>
             <div className="flex items-center justify-between mt-3">
               <span className="text-xs text-muted-foreground">
@@ -247,9 +247,11 @@ export default function Requests() {
                         </TableCell>
                         <TableCell>
                           <div className="text-sm">
-                            <p className="truncate max-w-[150px]">{request.pickup_location}</p>
-                            <p className="text-muted-foreground truncate max-w-[150px]">
-                              → {request.dropoff_location}
+                            <p className="truncate max-w-[150px]" title={request.pickup_location}>
+                              {request.pickup_location_name || request.pickup_location}
+                            </p>
+                            <p className="text-muted-foreground truncate max-w-[150px]" title={request.dropoff_location}>
+                              → {request.dropoff_location_name || request.dropoff_location}
                             </p>
                           </div>
                         </TableCell>

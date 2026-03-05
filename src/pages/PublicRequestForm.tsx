@@ -47,9 +47,12 @@ export default function PublicRequestForm() {
   const [submitted, setSubmitted] = useState(false);
   const [requestNumber, setRequestNumber] = useState<string>('');
   const [stops, setStops] = useState<string[]>([]);
+  const [stopNames, setStopNames] = useState<(string | undefined)[]>([]);
   const [pickupCoords, setPickupCoords] = useState<Coordinates | null>(null);
   const [dropoffCoords, setDropoffCoords] = useState<Coordinates | null>(null);
   const [stopCoords, setStopCoords] = useState<(Coordinates | null)[]>([]);
+  const [pickupLocationName, setPickupLocationName] = useState<string | undefined>();
+  const [dropoffLocationName, setDropoffLocationName] = useState<string | undefined>();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -81,9 +84,10 @@ export default function PublicRequestForm() {
 
   const { distanceKm, durationMinutes, isLoading: distanceLoading } = useDistanceCalculation(waypoints);
 
-  const handleStopsChange = (newStops: string[], newCoords?: (Coordinates | null)[]) => {
+  const handleStopsChange = (newStops: string[], newCoords?: (Coordinates | null)[], newNames?: (string | undefined)[]) => {
     setStops(newStops);
     if (newCoords) setStopCoords(newCoords);
+    if (newNames) setStopNames(newNames);
   };
 
   const onSubmit = async (values: FormValues) => {
@@ -112,7 +116,9 @@ export default function PublicRequestForm() {
         },
         requestData: {
           pickup_location: values.pickup_location,
+          pickup_location_name: pickupLocationName,
           dropoff_location: values.dropoff_location,
+          dropoff_location_name: dropoffLocationName,
           pickup_datetime: pickupDatetime.toISOString(),
           return_datetime: returnDatetime,
           trip_type: values.trip_type,
@@ -121,6 +127,7 @@ export default function PublicRequestForm() {
           special_requirements: values.special_requirements,
           notes: values.notes,
           stops: values.trip_type === 'multi_stop' ? stops.filter(s => s.trim()) : [],
+          stop_names: values.trip_type === 'multi_stop' ? stopNames : [],
           estimated_distance_km: distanceKm,
         },
       });
@@ -295,9 +302,10 @@ export default function PublicRequestForm() {
                         <FormControl>
                           <LocationAutocomplete
                             value={field.value}
-                            onChange={(val, coords) => {
+                            onChange={(val, coords, placeName) => {
                               field.onChange(val);
                               setPickupCoords(coords);
+                              setPickupLocationName(placeName);
                             }}
                             placeholder="Search pickup address"
                           />
@@ -315,9 +323,10 @@ export default function PublicRequestForm() {
                         <FormControl>
                           <LocationAutocomplete
                             value={field.value}
-                            onChange={(val, coords) => {
+                            onChange={(val, coords, placeName) => {
                               field.onChange(val);
                               setDropoffCoords(coords);
+                              setDropoffLocationName(placeName);
                             }}
                             placeholder="Search destination"
                           />

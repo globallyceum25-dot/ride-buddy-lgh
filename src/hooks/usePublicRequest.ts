@@ -11,7 +11,9 @@ interface GuestInfo {
 
 interface RequestData {
   pickup_location: string;
+  pickup_location_name?: string;
   dropoff_location: string;
+  dropoff_location_name?: string;
   pickup_datetime: string;
   return_datetime?: string;
   trip_type: 'one_way' | 'round_trip' | 'multi_stop';
@@ -20,6 +22,7 @@ interface RequestData {
   special_requirements?: string;
   notes?: string;
   stops?: string[];
+  stop_names?: (string | undefined)[];
   estimated_distance_km?: number | null;
 }
 

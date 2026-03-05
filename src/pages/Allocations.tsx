@@ -123,7 +123,9 @@ export default function Allocations() {
               </div>
               <RouteDisplay 
                 pickup={request.pickup_location} 
+                pickupName={(request as any).pickup_location_name}
                 destination={request.dropoff_location}
+                destinationName={(request as any).dropoff_location_name}
                 stops={(request as any).stops}
               />
               <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
@@ -195,7 +197,9 @@ export default function Allocations() {
             )}
             <RouteDisplay 
               pickup={allocation.request?.pickup_location || ''} 
+              pickupName={(allocation.request as any)?.pickup_location_name}
               destination={allocation.request?.dropoff_location || ''}
+              destinationName={(allocation.request as any)?.dropoff_location_name}
               stops={(allocation as any).stops}
             />
             <div className="flex items-center justify-between mt-3">
@@ -426,7 +430,9 @@ export default function Allocations() {
                           <TableCell>
                             <RouteDisplay 
                               pickup={request.pickup_location} 
+                              pickupName={(request as any).pickup_location_name}
                               destination={request.dropoff_location}
+                              destinationName={(request as any).dropoff_location_name}
                               stops={(request as any).stops}
                             />
                           </TableCell>
@@ -569,7 +575,9 @@ export default function Allocations() {
                             <TableCell>
                               <RouteDisplay 
                                 pickup={allocation.request?.pickup_location || ''} 
+                                pickupName={(allocation.request as any)?.pickup_location_name}
                                 destination={allocation.request?.dropoff_location || ''}
+                                destinationName={(allocation.request as any)?.dropoff_location_name}
                                 stops={(allocation as any).stops}
                               />
                             </TableCell>

@@ -111,6 +111,9 @@ export function RequestDetailDialog({
                     <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">Pickup</p>
+                      {request.pickup_location_name && (
+                        <p className="text-sm font-medium">{request.pickup_location_name}</p>
+                      )}
                       <p className="text-sm text-muted-foreground">{request.pickup_location}</p>
                     </div>
                   </div>
@@ -138,7 +141,12 @@ export function RequestDetailDialog({
                           {stops.map((stop, index) => (
                             <div key={stop.id} className="flex items-center gap-2">
                               <span className="text-xs text-muted-foreground w-12">Stop {index + 1}</span>
-                              <span className="text-sm text-muted-foreground">{stop.location}</span>
+                              <div>
+                                {stop.location_name && (
+                                  <span className="text-sm font-medium">{stop.location_name} · </span>
+                                )}
+                                <span className="text-sm text-muted-foreground">{stop.location}</span>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -150,6 +158,9 @@ export function RequestDetailDialog({
                     <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-sm font-medium">{stops.length > 0 ? 'Final Destination' : 'Destination'}</p>
+                      {request.dropoff_location_name && (
+                        <p className="text-sm font-medium">{request.dropoff_location_name}</p>
+                      )}
                       <p className="text-sm text-muted-foreground">{request.dropoff_location}</p>
                     </div>
                   </div>

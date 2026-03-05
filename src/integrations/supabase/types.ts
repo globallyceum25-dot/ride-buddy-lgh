@@ -511,6 +511,7 @@ export type Database = {
           created_at: string | null
           id: string
           location: string
+          location_name: string | null
           request_id: string
           stop_order: number
         }
@@ -518,6 +519,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           location: string
+          location_name?: string | null
           request_id: string
           stop_order: number
         }
@@ -525,6 +527,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           location?: string
+          location_name?: string | null
           request_id?: string
           stop_order?: number
         }
@@ -570,6 +573,7 @@ export type Database = {
           cost_center: string | null
           created_at: string
           dropoff_location: string
+          dropoff_location_name: string | null
           estimated_distance_km: number | null
           form_link_id: string | null
           guest_email: string | null
@@ -582,6 +586,7 @@ export type Database = {
           passenger_count: number
           pickup_datetime: string
           pickup_location: string
+          pickup_location_name: string | null
           priority: Database["public"]["Enums"]["request_priority"]
           purpose: string
           rejection_reason: string | null
@@ -600,6 +605,7 @@ export type Database = {
           cost_center?: string | null
           created_at?: string
           dropoff_location: string
+          dropoff_location_name?: string | null
           estimated_distance_km?: number | null
           form_link_id?: string | null
           guest_email?: string | null
@@ -612,6 +618,7 @@ export type Database = {
           passenger_count?: number
           pickup_datetime: string
           pickup_location: string
+          pickup_location_name?: string | null
           priority?: Database["public"]["Enums"]["request_priority"]
           purpose: string
           rejection_reason?: string | null
@@ -630,6 +637,7 @@ export type Database = {
           cost_center?: string | null
           created_at?: string
           dropoff_location?: string
+          dropoff_location_name?: string | null
           estimated_distance_km?: number | null
           form_link_id?: string | null
           guest_email?: string | null
@@ -642,6 +650,7 @@ export type Database = {
           passenger_count?: number
           pickup_datetime?: string
           pickup_location?: string
+          pickup_location_name?: string | null
           priority?: Database["public"]["Enums"]["request_priority"]
           purpose?: string
           rejection_reason?: string | null

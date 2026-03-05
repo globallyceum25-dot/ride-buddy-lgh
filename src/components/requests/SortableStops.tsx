@@ -25,7 +25,7 @@ interface SortableStopItemProps {
   index: number;
   value: string;
   coords: Coordinates | null;
-  onChange: (value: string, coords: Coordinates | null) => void;
+  onChange: (value: string, coords: Coordinates | null, placeName?: string) => void;
   onRemove: () => void;
 }
 
@@ -80,11 +80,12 @@ function SortableStopItem({ id, index, value, coords, onChange, onRemove }: Sort
 
 interface SortableStopsProps {
   stops: string[];
-  onStopsChange: (stops: string[], coords?: (Coordinates | null)[]) => void;
+  onStopsChange: (stops: string[], coords?: (Coordinates | null)[], names?: (string | undefined)[]) => void;
   stopCoords?: (Coordinates | null)[];
+  stopNames?: (string | undefined)[];
 }
 
-export function SortableStops({ stops, onStopsChange, stopCoords = [] }: SortableStopsProps) {
+export function SortableStops({ stops, onStopsChange, stopCoords = [], stopNames = [] }: SortableStopsProps) {
   // Generate stable IDs for each stop
   const [stopIds] = useState<string[]>(() => 
     stops.map((_, i) => `stop-${i}-${Date.now()}`)
@@ -114,23 +115,28 @@ export function SortableStops({ stops, onStopsChange, stopCoords = [] }: Sortabl
   const addStop = () => {
     stopIds.push(`stop-${stopIds.length}-${Date.now()}`);
     const newCoords = [...stopCoords, null];
-    onStopsChange([...stops, ''], newCoords);
+    const newNames = [...stopNames, undefined];
+    onStopsChange([...stops, ''], newCoords, newNames);
   };
 
   const removeStop = (index: number) => {
     stopIds.splice(index, 1);
     const newStops = stops.filter((_, i) => i !== index);
     const newCoords = stopCoords.filter((_, i) => i !== index);
-    onStopsChange(newStops, newCoords);
+    const newNames = stopNames.filter((_, i) => i !== index);
+    onStopsChange(newStops, newCoords, newNames);
   };
 
-  const updateStop = (index: number, value: string, coords: Coordinates | null) => {
+  const updateStop = (index: number, value: string, coords: Coordinates | null, placeName?: string) => {
     const updatedStops = [...stops];
     updatedStops[index] = value;
     const updatedCoords = [...stopCoords];
     while (updatedCoords.length <= index) updatedCoords.push(null);
     updatedCoords[index] = coords;
-    onStopsChange(updatedStops, updatedCoords);
+    const updatedNames = [...stopNames];
+    while (updatedNames.length <= index) updatedNames.push(undefined);
+    updatedNames[index] = placeName;
+    onStopsChange(updatedStops, updatedCoords, updatedNames);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -143,11 +149,12 @@ export function SortableStops({ stops, onStopsChange, stopCoords = [] }: Sortabl
       const newIds = arrayMove(currentIds, oldIndex, newIndex);
       const newStops = arrayMove(stops, oldIndex, newIndex);
       const newCoords = arrayMove([...stopCoords], oldIndex, newIndex);
+      const newNames = arrayMove([...stopNames], oldIndex, newIndex);
       
       stopIds.length = 0;
       stopIds.push(...newIds);
       
-      onStopsChange(newStops, newCoords);
+      onStopsChange(newStops, newCoords, newNames);
     }
   };
 
@@ -179,7 +186,7 @@ export function SortableStops({ stops, onStopsChange, stopCoords = [] }: Sortabl
                   index={index}
                   value={stop}
                   coords={stopCoords[index] || null}
-                  onChange={(value, coords) => updateStop(index, value, coords)}
+                  onChange={(value, coords, placeName) => updateStop(index, value, coords, placeName)}
                   onRemove={() => removeStop(index)}
                 />
               ))}

@@ -79,7 +79,9 @@ Deno.serve(async (req) => {
       .from('travel_requests')
       .insert({
         pickup_location: requestData.pickup_location,
+        pickup_location_name: requestData.pickup_location_name || null,
         dropoff_location: requestData.dropoff_location,
+        dropoff_location_name: requestData.dropoff_location_name || null,
         pickup_datetime: requestData.pickup_datetime,
         return_datetime: requestData.return_datetime || null,
         trip_type: requestData.trip_type || 'one_way',
@@ -115,6 +117,7 @@ Deno.serve(async (req) => {
       const stopsToInsert = requestData.stops.map((location: string, index: number) => ({
         request_id: request.id,
         location,
+        location_name: requestData.stop_names?.[index] || null,
         stop_order: index + 1,
       }));
 
