@@ -1,18 +1,18 @@
 
 
-# Add Location Names to DayTripPopover
+# Fix Immediate Request Notifications to Coordinators
 
-## Analysis
-- `DayAgendaPanel` already uses `AgendaTripCard`, which was updated in the previous round — **no changes needed**.
-- `DayTripPopover` has its own **local** `MonthTripPreview` interface (lines 14-24) that lacks `pickupName` and `dropoffName`. Its `TripPreviewRow` displays only `trip.pickup → trip.dropoff`.
+## Problem
+The frontend code already notifies all `location_coordinator` users when an immediate request is created (lines 443-466 in `useRequests.ts`), but the `send-notification` edge function doesn't have a handler for the `immediate_allocation` notification type. It falls into the `else` branch (overdue handler), generating an incorrect message.
 
-## Changes
+## Fix
 
-### `src/components/trips/DayTripPopover.tsx`
-1. Add `pickupName?: string | null` and `dropoffName?: string | null` to the local `MonthTripPreview` interface.
-2. In `TripPreviewRow` (line 47-49), show location names as primary text with address fallback:
-   - `{trip.pickupName || trip.pickup} → {trip.dropoffName || trip.dropoff}`
-   - If a name exists and differs from the address, show the address as a secondary line in muted text below.
+### `supabase/functions/send-notification/index.ts`
+1. Add `'immediate_allocation'` to the `NotificationPayload` type union
+2. Add a new `else if (type === "immediate_allocation")` block that builds an appropriate subject and body:
+   - Subject: `Travel Request {requestNumber} - Immediate Allocation Required`
+   - Body: `An immediate travel request {requestNumber} requires allocation.\n\nRoute: {route}\nRequester: {requesterName}\nPickup: {pickupDatetime}\nPurpose: {purpose}`
+3. Add a Telegram template with a ⚡ emoji for the immediate allocation type
 
-No other files need changes.
+This is a single-file change to the edge function. No other files need modification since the frontend already sends the correct payload.
 
