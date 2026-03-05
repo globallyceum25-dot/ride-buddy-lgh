@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { MapPin, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
+import { useGoogleMapsLoaded } from '@/hooks/useGoogleMapsLoaded';
 export interface Coordinates {
   lat: number;
   lng: number;
@@ -35,17 +35,17 @@ export function LocationAutocomplete({
   const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
   const dummyDivRef = useRef<HTMLDivElement | null>(null);
+  const mapsLoaded = useGoogleMapsLoaded();
 
-  // Initialize Google services
+  // Initialize Google services when loaded
   useEffect(() => {
-    if (typeof google !== 'undefined' && google.maps?.places) {
-      autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
-      if (!dummyDivRef.current) {
-        dummyDivRef.current = document.createElement('div');
-      }
-      placesServiceRef.current = new google.maps.places.PlacesService(dummyDivRef.current);
+    if (!mapsLoaded) return;
+    autocompleteServiceRef.current = new google.maps.places.AutocompleteService();
+    if (!dummyDivRef.current) {
+      dummyDivRef.current = document.createElement('div');
     }
-  }, []);
+    placesServiceRef.current = new google.maps.places.PlacesService(dummyDivRef.current);
+  }, [mapsLoaded]);
 
   // Sync external value changes
   useEffect(() => {
@@ -139,11 +139,12 @@ export function LocationAutocomplete({
           value={query}
           onChange={handleInputChange}
           onFocus={() => results.length > 0 && setIsOpen(true)}
-          placeholder={placeholder}
+          placeholder={!mapsLoaded ? 'Loading maps...' : placeholder}
           className={cn('pr-8', className)}
+          disabled={!mapsLoaded}
         />
         <div className="absolute right-2 top-1/2 -translate-y-1/2">
-          {isLoading ? (
+          {!mapsLoaded || isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           ) : (
             <MapPin className="h-4 w-4 text-muted-foreground" />

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Coordinates } from '@/components/shared/LocationAutocomplete';
+import { useGoogleMapsLoaded } from '@/hooks/useGoogleMapsLoaded';
 
 interface DistanceResult {
   distanceKm: number | null;
@@ -12,8 +13,11 @@ export function useDistanceCalculation(waypoints: (Coordinates | null)[]): Dista
   const [durationMinutes, setDurationMinutes] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const mapsLoaded = useGoogleMapsLoaded();
 
   useEffect(() => {
+    if (!mapsLoaded) return;
+
     const validWaypoints = waypoints.filter((w): w is Coordinates => w !== null);
 
     if (validWaypoints.length < 2) {
@@ -25,7 +29,6 @@ export function useDistanceCalculation(waypoints: (Coordinates | null)[]): Dista
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     debounceRef.current = setTimeout(() => {
-      if (typeof google === 'undefined' || !google.maps) return;
 
       setIsLoading(true);
       const service = new google.maps.DirectionsService();
@@ -71,7 +74,7 @@ export function useDistanceCalculation(waypoints: (Coordinates | null)[]): Dista
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [waypoints.map((w) => (w ? `${w.lat},${w.lng}` : 'null')).join('|')]);
+  }, [mapsLoaded, waypoints.map((w) => (w ? `${w.lat},${w.lng}` : 'null')).join('|')]);
 
   return { distanceKm, durationMinutes, isLoading };
 }
