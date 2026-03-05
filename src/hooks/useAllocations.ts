@@ -29,6 +29,8 @@ export interface Allocation {
   actual_dropoff: string | null;
   odometer_start: number | null;
   odometer_end: number | null;
+  fare_amount: number | null;
+  receipt_reference: string | null;
   notes: string | null;
   status: AllocationStatus;
   created_at: string;
@@ -92,6 +94,8 @@ export interface AllocationInsert {
   driver_id?: string | null;
   pool_id?: string | null;
   hailing_service?: HailingServiceType | null;
+  fare_amount?: number | null;
+  receipt_reference?: string | null;
   scheduled_pickup: string;
   scheduled_dropoff?: string | null;
   notes?: string | null;
@@ -490,6 +494,8 @@ export function useUpdateAllocationStatus() {
       actual_dropoff?: string;
       odometer_start?: number;
       odometer_end?: number;
+      fare_amount?: number;
+      receipt_reference?: string;
     }) => {
       const { data, error } = await supabase
         .from('allocations')

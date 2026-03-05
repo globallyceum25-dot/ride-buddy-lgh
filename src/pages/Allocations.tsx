@@ -166,8 +166,17 @@ export default function Allocations() {
               <AllocationStatusBadge status={allocation.status} />
             </div>
             <p className="text-sm">
-              {allocation.hailing_service ? (
-                <Badge variant="secondary">{HAILING_SERVICE_LABELS[allocation.hailing_service]}</Badge>
+            {allocation.hailing_service ? (
+                <div>
+                  <Badge variant="secondary">{HAILING_SERVICE_LABELS[allocation.hailing_service]}</Badge>
+                  {(allocation.fare_amount || allocation.receipt_reference) && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {allocation.fare_amount != null && `LKR ${allocation.fare_amount.toLocaleString()}`}
+                      {allocation.fare_amount != null && allocation.receipt_reference && ' • '}
+                      {allocation.receipt_reference && `Ref: ${allocation.receipt_reference}`}
+                    </p>
+                  )}
+                </div>
               ) : (
                 <>
                   {allocation.vehicle?.registration_number}
@@ -527,7 +536,16 @@ export default function Allocations() {
                             <TableCell className="font-medium">{allocation.request?.request_number}</TableCell>
                             <TableCell>
                               {allocation.hailing_service ? (
-                                <Badge variant="secondary">{HAILING_SERVICE_LABELS[allocation.hailing_service]}</Badge>
+                                <div>
+                                  <Badge variant="secondary">{HAILING_SERVICE_LABELS[allocation.hailing_service]}</Badge>
+                                  {(allocation.fare_amount || allocation.receipt_reference) && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {allocation.fare_amount != null && `LKR ${allocation.fare_amount.toLocaleString()}`}
+                                      {allocation.fare_amount != null && allocation.receipt_reference && ' • '}
+                                      {allocation.receipt_reference && `Ref: ${allocation.receipt_reference}`}
+                                    </p>
+                                  )}
+                                </div>
                               ) : (
                                 <>
                                   {allocation.vehicle?.registration_number}

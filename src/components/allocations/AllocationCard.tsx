@@ -238,11 +238,20 @@ export function AllocationCard({
       {/* Vehicle & Driver / Hailing Service */}
       <div className="flex items-center justify-between pt-2 border-t">
         {allocation.hailing_service ? (
-          <div className="flex items-center gap-1.5 text-xs">
-            <Navigation className="h-3 w-3 text-muted-foreground" />
-            <Badge variant="secondary" className="text-xs">
-              {HAILING_SERVICE_LABELS[allocation.hailing_service]}
-            </Badge>
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-xs">
+              <Navigation className="h-3 w-3 text-muted-foreground" />
+              <Badge variant="secondary" className="text-xs">
+                {HAILING_SERVICE_LABELS[allocation.hailing_service]}
+              </Badge>
+            </div>
+            {(allocation.fare_amount || allocation.receipt_reference) && (
+              <p className="text-[10px] text-muted-foreground pl-4">
+                {allocation.fare_amount != null && `LKR ${allocation.fare_amount.toLocaleString()}`}
+                {allocation.fare_amount != null && allocation.receipt_reference && ' • '}
+                {allocation.receipt_reference && `Ref: ${allocation.receipt_reference}`}
+              </p>
+            )}
           </div>
         ) : (
           <>

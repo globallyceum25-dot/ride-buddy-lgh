@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Input } from '@/components/ui/input';
 import { format, isPast } from 'date-fns';
 import { AlertTriangle, Calendar, Car, User, Navigation } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -82,6 +83,8 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
   const [vehicleId, setVehicleId] = useState<string>('');
   const [driverId, setDriverId] = useState<string>('');
   const [hailingService, setHailingService] = useState<string>('');
+  const [fareAmount, setFareAmount] = useState<string>('');
+  const [receiptReference, setReceiptReference] = useState<string>('');
   const [notes, setNotes] = useState('');
   
   const { data: vehicles = [] } = useVehicles();
@@ -118,6 +121,8 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
       setVehicleId('');
       setDriverId('');
       setHailingService('');
+      setFareAmount('');
+      setReceiptReference('');
       setNotes('');
     }
   }, [open]);
@@ -141,6 +146,8 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
         vehicle_id: null,
         driver_id: null,
         hailing_service: hailingService as HailingServiceType,
+        fare_amount: fareAmount ? parseFloat(fareAmount) : undefined,
+        receipt_reference: receiptReference || undefined,
         scheduled_pickup: request.pickup_datetime,
         notes: notes || undefined,
       });
@@ -355,9 +362,32 @@ export function AllocationDialog({ open, onOpenChange, request }: AllocationDial
                   </SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Use the notes field below to add booking reference, cost, or other details.
-              </p>
+              {/* Fare Amount */}
+              <div className="space-y-2">
+                <Label htmlFor="fare-amount">Fare Amount (LKR)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">LKR</span>
+                  <Input
+                    id="fare-amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={fareAmount}
+                    onChange={(e) => setFareAmount(e.target.value)}
+                    className="pl-12"
+                  />
+                </div>
+              </div>
+
+              {/* Receipt Reference */}
+              <div className="space-y-2">
+                <Label htmlFor="receipt-ref">Receipt / Booking Reference</Label>
+                <Input
+                  id="receipt-ref"
+                  placeholder="e.g. PK-123456"
+                  value={receiptReference}
+                  onChange={(e) => setReceiptReference(e.target.value)}
+                />
+              </div>
             </div>
           )}
           

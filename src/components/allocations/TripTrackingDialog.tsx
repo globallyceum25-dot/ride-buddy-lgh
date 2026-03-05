@@ -25,6 +25,8 @@ interface TripTrackingDialogProps {
     odometer_end?: number;
     actual_pickup?: string;
     actual_dropoff?: string;
+    fare_amount?: number;
+    receipt_reference?: string;
   }) => void;
   isLoading?: boolean;
   poolCount?: number; // Number of allocations in the pool
@@ -40,12 +42,16 @@ export function TripTrackingDialog({
   poolCount,
 }: TripTrackingDialogProps) {
   const [odometer, setOdometer] = useState<string>('');
+  const [fareAmount, setFareAmount] = useState<string>('');
+  const [receiptRef, setReceiptRef] = useState<string>('');
   const [error, setError] = useState<string>('');
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
       setOdometer('');
+      setFareAmount(allocation?.fare_amount?.toString() || '');
+      setReceiptRef(allocation?.receipt_reference || '');
       setError('');
     }
   }, [open]);
@@ -55,12 +61,16 @@ export function TripTrackingDialog({
   const odometerStart = allocation?.odometer_start || 0;
 
   const handleSubmit = () => {
-    // For hailing service, skip odometer validation
+    // For hailing service, skip odometer validation but capture cost
     if (isHailingService) {
       if (mode === 'start') {
         onSubmit({ actual_pickup: new Date().toISOString() });
       } else {
-        onSubmit({ actual_dropoff: new Date().toISOString() });
+        onSubmit({
+          actual_dropoff: new Date().toISOString(),
+          fare_amount: fareAmount ? parseFloat(fareAmount) : undefined,
+          receipt_reference: receiptRef || undefined,
+        });
       }
       return;
     }
@@ -180,8 +190,36 @@ export function TripTrackingDialog({
             </div>
           )}
 
-          {/* Hailing Service Notice */}
-          {isHailingService && (
+          {/* Hailing Service Cost Fields */}
+          {isHailingService && mode === 'complete' && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="fare">Fare Amount (LKR)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">LKR</span>
+                  <Input
+                    id="fare"
+                    type="number"
+                    placeholder="0.00"
+                    value={fareAmount}
+                    onChange={(e) => setFareAmount(e.target.value)}
+                    className="pl-12"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="receipt">Receipt / Booking Reference</Label>
+                <Input
+                  id="receipt"
+                  placeholder="e.g. PK-123456"
+                  value={receiptRef}
+                  onChange={(e) => setReceiptRef(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          {isHailingService && mode === 'start' && (
             <div className="rounded-lg border border-info/50 bg-info/10 p-3">
               <p className="text-sm text-info-foreground">
                 <Navigation className="h-4 w-4 inline mr-1" />

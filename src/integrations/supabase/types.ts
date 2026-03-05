@@ -22,6 +22,7 @@ export type Database = {
           allocated_by: string | null
           created_at: string | null
           driver_id: string | null
+          fare_amount: number | null
           hailing_service:
             | Database["public"]["Enums"]["hailing_service_type"]
             | null
@@ -30,6 +31,7 @@ export type Database = {
           odometer_end: number | null
           odometer_start: number | null
           pool_id: string | null
+          receipt_reference: string | null
           request_id: string
           scheduled_dropoff: string | null
           scheduled_pickup: string
@@ -44,6 +46,7 @@ export type Database = {
           allocated_by?: string | null
           created_at?: string | null
           driver_id?: string | null
+          fare_amount?: number | null
           hailing_service?:
             | Database["public"]["Enums"]["hailing_service_type"]
             | null
@@ -52,6 +55,7 @@ export type Database = {
           odometer_end?: number | null
           odometer_start?: number | null
           pool_id?: string | null
+          receipt_reference?: string | null
           request_id: string
           scheduled_dropoff?: string | null
           scheduled_pickup: string
@@ -66,6 +70,7 @@ export type Database = {
           allocated_by?: string | null
           created_at?: string | null
           driver_id?: string | null
+          fare_amount?: number | null
           hailing_service?:
             | Database["public"]["Enums"]["hailing_service_type"]
             | null
@@ -74,6 +79,7 @@ export type Database = {
           odometer_end?: number | null
           odometer_start?: number | null
           pool_id?: string | null
+          receipt_reference?: string | null
           request_id?: string
           scheduled_dropoff?: string | null
           scheduled_pickup?: string
