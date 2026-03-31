@@ -6,7 +6,8 @@ const corsHeaders = {
 }
 
 interface CreateUserRequest {
-  email: string
+  identifier_type?: 'email' | 'phone'
+  email?: string
   password: string
   full_name: string
   phone?: string
@@ -84,11 +85,12 @@ Deno.serve(async (req) => {
 
     // Parse and validate request body
     const body: CreateUserRequest = await req.json()
+    const identifierType = body.identifier_type || 'email'
     
-    // Basic validation
-    if (!body.email || !body.password || !body.full_name) {
+    // Common validation
+    if (!body.password || !body.full_name) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: email, password, full_name' }),
+        JSON.stringify({ error: 'Missing required fields: password, full_name' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -96,15 +98,6 @@ Deno.serve(async (req) => {
     if (body.password.length < 8) {
       return new Response(
         JSON.stringify({ error: 'Password must be at least 8 characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(body.email)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid email format' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -122,24 +115,95 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log('Creating user with email:', body.email)
+    let authData
+    let profileEmail: string
 
-    // Create auth user using admin API
-    const { data: authData, error: createError } = await adminClient.auth.admin.createUser({
-      email: body.email,
-      password: body.password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: body.full_name
+    if (identifierType === 'phone') {
+      // Phone-based creation
+      if (!body.phone) {
+        return new Response(
+          JSON.stringify({ error: 'Phone number is required for phone-based user creation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
-    })
 
-    if (createError) {
-      console.error('Error creating auth user:', createError)
-      return new Response(
-        JSON.stringify({ error: createError.message }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      // Validate E.164 format
+      const phoneRegex = /^\+[1-9]\d{6,14}$/
+      if (!phoneRegex.test(body.phone)) {
+        return new Response(
+          JSON.stringify({ error: 'Phone number must be in E.164 format (e.g. +94771234567)' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Use provided email or generate placeholder
+      profileEmail = body.email && body.email.trim() !== '' ? body.email : `phone_${body.phone.replace(/\+/g, '')}@noemail.local`
+
+      console.log('Creating user with phone:', body.phone)
+
+      const createUserPayload: Record<string, unknown> = {
+        phone: body.phone,
+        password: body.password,
+        phone_confirm: true,
+        user_metadata: {
+          full_name: body.full_name
+        }
+      }
+
+      // Include email if provided
+      if (body.email && body.email.trim() !== '') {
+        createUserPayload.email = body.email
+        createUserPayload.email_confirm = true
+      }
+
+      const { data, error: createError } = await adminClient.auth.admin.createUser(createUserPayload)
+
+      if (createError) {
+        console.error('Error creating auth user:', createError)
+        return new Response(
+          JSON.stringify({ error: createError.message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      authData = data
+    } else {
+      // Email-based creation (default)
+      if (!body.email) {
+        return new Response(
+          JSON.stringify({ error: 'Email is required for email-based user creation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(body.email)) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid email format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      profileEmail = body.email
+
+      console.log('Creating user with email:', body.email)
+
+      const { data, error: createError } = await adminClient.auth.admin.createUser({
+        email: body.email,
+        password: body.password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: body.full_name
+        }
+      })
+
+      if (createError) {
+        console.error('Error creating auth user:', createError)
+        return new Response(
+          JSON.stringify({ error: createError.message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      authData = data
     }
 
     const newUserId = authData.user.id
@@ -149,22 +213,22 @@ Deno.serve(async (req) => {
     await new Promise(resolve => setTimeout(resolve, 500))
 
     // Update profile with additional fields
-    const profileUpdate: Record<string, unknown> = {}
+    const profileUpdate: Record<string, unknown> = {
+      email: profileEmail,
+    }
     if (body.phone) profileUpdate.phone = body.phone
     if (body.employee_id) profileUpdate.employee_id = body.employee_id
     if (body.department) profileUpdate.department = body.department
     if (body.cost_center) profileUpdate.cost_center = body.cost_center
 
-    if (Object.keys(profileUpdate).length > 0) {
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .update(profileUpdate)
-        .eq('user_id', newUserId)
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .update(profileUpdate)
+      .eq('user_id', newUserId)
 
-      if (profileError) {
-        console.error('Error updating profile:', profileError)
-        // Non-fatal, continue with role assignment
-      }
+    if (profileError) {
+      console.error('Error updating profile:', profileError)
+      // Non-fatal, continue with role assignment
     }
 
     // Assign roles
@@ -207,7 +271,7 @@ Deno.serve(async (req) => {
         success: true,
         user: {
           id: newUserId,
-          email: body.email,
+          email: profileEmail,
           full_name: body.full_name
         }
       }),

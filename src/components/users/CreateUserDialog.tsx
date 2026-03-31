@@ -26,21 +26,39 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { useCreateUser, AppRole } from '@/hooks/useUsers';
 import { useLocations } from '@/hooks/useLocations';
 
-const formSchema = z.object({
+const emailSchema = z.object({
+  identifier_type: z.literal('email'),
   email: z.string().email('Invalid email address'),
+  phone: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   full_name: z.string().min(1, 'Full name is required'),
-  phone: z.string().optional(),
   employee_id: z.string().optional(),
   department: z.string().optional(),
   cost_center: z.string().optional(),
   roles: z.array(z.string()).min(1, 'At least one role is required'),
   primary_location_id: z.string().optional(),
 });
+
+const phoneSchema = z.object({
+  identifier_type: z.literal('phone'),
+  phone: z.string().min(10, 'Phone number is required (E.164 format, e.g. +94771234567)'),
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  full_name: z.string().min(1, 'Full name is required'),
+  employee_id: z.string().optional(),
+  department: z.string().optional(),
+  cost_center: z.string().optional(),
+  roles: z.array(z.string()).min(1, 'At least one role is required'),
+  primary_location_id: z.string().optional(),
+});
+
+const formSchema = z.discriminatedUnion('identifier_type', [emailSchema, phoneSchema]);
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -60,10 +78,12 @@ interface CreateUserDialogProps {
 export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) {
   const createUser = useCreateUser();
   const { data: locations } = useLocations();
+  const [identifierType, setIdentifierType] = useState<'email' | 'phone'>('email');
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      identifier_type: 'email',
       email: '',
       password: '',
       full_name: '',
@@ -76,10 +96,18 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
     },
   });
 
+  const handleIdentifierTypeChange = (value: 'email' | 'phone') => {
+    setIdentifierType(value);
+    form.setValue('identifier_type', value);
+    // Clear validation errors when switching
+    form.clearErrors();
+  };
+
   const onSubmit = async (values: FormValues) => {
     try {
       await createUser.mutateAsync({
-        email: values.email,
+        identifier_type: values.identifier_type,
+        email: values.email || undefined,
         password: values.password,
         full_name: values.full_name,
         phone: values.phone,
@@ -90,6 +118,7 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
         primary_location_id: values.primary_location_id || undefined,
       });
       form.reset();
+      setIdentifierType('email');
       onOpenChange(false);
     } catch {
       // Error handled by mutation
@@ -104,20 +133,70 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Identifier Type Toggle */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Create by</Label>
+              <RadioGroup
+                value={identifierType}
+                onValueChange={(v) => handleIdentifierTypeChange(v as 'email' | 'phone')}
+                className="flex gap-4"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="email" id="id-email" />
+                  <Label htmlFor="id-email" className="cursor-pointer">Email</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="phone" id="id-phone" />
+                  <Label htmlFor="id-phone" className="cursor-pointer">Phone</Label>
+                </div>
+              </RadioGroup>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem className="col-span-2">
-                    <FormLabel>Email *</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="user@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {identifierType === 'email' ? (
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Email *</FormLabel>
+                      <FormControl>
+                        <Input type="email" placeholder="user@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Phone Number *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="+94771234567" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem className="col-span-2">
+                        <FormLabel>Email (optional)</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="user@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
+              )}
               
               <FormField
                 control={form.control}
@@ -147,19 +226,21 @@ export function CreateUserDialog({ open, onOpenChange }: CreateUserDialogProps) 
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+1234567890" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {identifierType === 'email' && (
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="+1234567890" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
