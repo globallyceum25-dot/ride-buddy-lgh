@@ -24,7 +24,8 @@ export interface UserWithDetails {
 }
 
 interface CreateUserData {
-  email: string;
+  identifier_type?: 'email' | 'phone';
+  email?: string;
   password: string;
   full_name: string;
   phone?: string;
