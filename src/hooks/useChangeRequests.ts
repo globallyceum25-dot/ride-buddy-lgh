@@ -46,14 +46,14 @@ export function useChangeRequestsForRequest(requestId?: string) {
   return useQuery({
     queryKey: ['change-requests', 'by-request', requestId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from('request_change_requests' as any)
         .select('*')
         .eq('request_id', requestId!)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as any);
 
       if (error) throw error;
-      return data as ChangeRequest[];
+      return (data || []) as ChangeRequest[];
     },
     enabled: !!requestId,
   });
