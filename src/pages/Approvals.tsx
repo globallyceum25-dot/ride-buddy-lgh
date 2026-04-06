@@ -38,10 +38,12 @@ export default function Approvals() {
   const [selectedChangeRequest, setSelectedChangeRequest] = useState<ChangeRequest | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected' | 'changes'>('pending');
   const isMobile = useIsMobile();
+  const { isAdmin } = useAuth();
+  const adminFlag = isAdmin();
 
-  const { data: pendingRequests = [], isLoading: loadingPending } = usePendingApprovals();
-  const { data: approvedRequests = [], isLoading: loadingApproved } = useApprovalRequests('approved' as RequestStatus);
-  const { data: rejectedRequests = [], isLoading: loadingRejected } = useApprovalRequests('rejected' as RequestStatus);
+  const { data: pendingRequests = [], isLoading: loadingPending } = usePendingApprovals(adminFlag);
+  const { data: approvedRequests = [], isLoading: loadingApproved } = useApprovalRequests('approved' as RequestStatus, adminFlag);
+  const { data: rejectedRequests = [], isLoading: loadingRejected } = useApprovalRequests('rejected' as RequestStatus, adminFlag);
   const { data: pendingChanges = [], isLoading: loadingChanges } = usePendingChangeRequests();
 
   const renderMobileCards = (
