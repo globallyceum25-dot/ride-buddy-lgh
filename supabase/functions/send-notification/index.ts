@@ -207,6 +207,12 @@ Deno.serve(async (req) => {
         } else if (type === "immediate_allocation") {
           const pickupStr = details.pickupDatetime ? new Date(details.pickupDatetime).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" }) : "TBD";
           telegramText = `<b>⚡ ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Requester:</b> ${details.requesterName || "N/A"}\n<b>Pickup:</b> ${pickupStr}\n<b>Purpose:</b> ${details.purpose || "N/A"}`;
+        } else if (type === "change_request_submitted") {
+          telegramText = `<b>📝 ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Reason:</b> ${details.reason || "N/A"}`;
+        } else if (type === "change_request_approved") {
+          telegramText = `<b>✅ ${subject}</b>\n\n<b>Route:</b> ${details.route}${details.reviewNotes ? `\n<b>Notes:</b> ${details.reviewNotes}` : ''}`;
+        } else if (type === "change_request_rejected") {
+          telegramText = `<b>❌ ${subject}</b>\n\n<b>Route:</b> ${details.route}${details.reviewNotes ? `\n<b>Reason:</b> ${details.reviewNotes}` : ''}`;
         } else {
           telegramText = `<b>🚗 ${subject}</b>\n\n${bodyText}`;
         }
