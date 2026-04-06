@@ -64,13 +64,14 @@ export function usePendingChangeRequests() {
   return useQuery({
     queryKey: ['change-requests', 'pending'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase
         .from('request_change_requests' as any)
         .select('*')
         .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as any);
 
       if (error) throw error;
+      const rawData = (data || []) as ChangeRequest[];
 
       // Fetch related travel request info and requester profiles
       const enriched: ChangeRequest[] = [];
