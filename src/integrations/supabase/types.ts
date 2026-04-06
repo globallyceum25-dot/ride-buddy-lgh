@@ -943,6 +943,18 @@ export type Database = {
         Returns: undefined
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      log_audit: {
+        Args: {
+          _action: string
+          _ip_address?: string
+          _new_values?: Json
+          _old_values?: Json
+          _record_id?: string
+          _table_name?: string
+          _user_agent?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       allocation_status:
