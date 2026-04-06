@@ -33,6 +33,7 @@ type FormLinkWithDepartment = {
   expires_at: string | null;
   created_at: string | null;
   department?: { id: string; name: string; code: string } | null;
+  submission_count: number | null;
   [key: string]: unknown;
 };
 

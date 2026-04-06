@@ -129,16 +129,18 @@ export function useCreateChangeRequest() {
 
   return useMutation({
     mutationFn: async (input: CreateChangeRequestInput) => {
+      const insertData = {
+        request_id: input.request_id,
+        requested_by: user!.id,
+        change_type: input.change_type,
+        current_values: input.current_values as import('@/integrations/supabase/types').Json,
+        requested_values: input.requested_values as import('@/integrations/supabase/types').Json,
+        reason: input.reason,
+      };
+
       const { data, error } = await supabase
         .from('request_change_requests')
-        .insert({
-          request_id: input.request_id,
-          requested_by: user!.id,
-          change_type: input.change_type,
-          current_values: input.current_values,
-          requested_values: input.requested_values,
-          reason: input.reason,
-        })
+        .insert(insertData)
         .select()
         .single();
 

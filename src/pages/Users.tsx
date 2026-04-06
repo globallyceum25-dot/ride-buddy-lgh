@@ -24,14 +24,33 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/shared/StatusBadge';
-import { Plus, Search, MoreHorizontal, Pencil, Shield, UserX, UserCheck, Users } from 'lucide-react';
-import { useUsers, useToggleUserActive, UserWithDetails, AppRole } from '@/hooks/useUsers';
+import { Plus, Search, MoreHorizontal, Pencil, Shield, UserX, UserCheck, Users, KeyRound, Copy, Eye, EyeOff } from 'lucide-react';
+import { useUsers, useToggleUserActive, useResetUserPassword, UserWithDetails, AppRole } from '@/hooks/useUsers';
 import { CreateUserDialog } from '@/components/users/CreateUserDialog';
 import { EditUserDialog } from '@/components/users/EditUserDialog';
 import { RoleManagementDialog } from '@/components/users/RoleManagementDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useToast } from '@/hooks/use-toast';
 
 const ROLE_COLORS: Record<AppRole, string> = {
   staff: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
@@ -52,7 +71,9 @@ const ROLE_LABELS: Record<AppRole, string> = {
 export default function UsersPage() {
   const { data: users, isLoading } = useUsers();
   const toggleActive = useToggleUserActive();
+  const resetPassword = useResetUserPassword();
   const isMobile = useIsMobile();
+  const { toast } = useToast();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -61,6 +82,12 @@ export default function UsersPage() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserWithDetails | null>(null);
   const [roleUser, setRoleUser] = useState<UserWithDetails | null>(null);
+
+  // Reset password state
+  const [resetConfirmUser, setResetConfirmUser] = useState<UserWithDetails | null>(null);
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetPasswordUserName, setResetPasswordUserName] = useState('');
 
   const filteredUsers = users?.filter(user => {
     const searchLower = searchQuery.toLowerCase();
@@ -75,6 +102,26 @@ export default function UsersPage() {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  const handleResetPassword = async () => {
+    if (!resetConfirmUser) return;
+    const userName = resetConfirmUser.full_name;
+    setResetConfirmUser(null);
+    
+    const result = await resetPassword.mutateAsync(resetConfirmUser.user_id);
+    if (result?.temporary_password) {
+      setGeneratedPassword(result.temporary_password);
+      setResetPasswordUserName(userName);
+      setShowPassword(false);
+    }
+  };
+
+  const copyPassword = () => {
+    if (generatedPassword) {
+      navigator.clipboard.writeText(generatedPassword);
+      toast({ title: 'Copied', description: 'Temporary password copied to clipboard.' });
+    }
+  };
+
   const renderActionMenu = (user: UserWithDetails) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -86,6 +133,9 @@ export default function UsersPage() {
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setRoleUser(user)}>
           <Shield className="mr-2 h-4 w-4" />Manage Roles
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => setResetConfirmUser(user)}>
+          <KeyRound className="mr-2 h-4 w-4" />Reset Password
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => toggleActive.mutate({ userId: user.user_id, isActive: !user.is_active })}>
           {user.is_active ? (
@@ -247,6 +297,55 @@ export default function UsersPage() {
       <CreateUserDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
       <EditUserDialog user={editUser} open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)} />
       <RoleManagementDialog user={roleUser} open={!!roleUser} onOpenChange={(open) => !open && setRoleUser(null)} />
+
+      {/* Reset Password Confirmation */}
+      <AlertDialog open={!!resetConfirmUser} onOpenChange={(open) => !open && setResetConfirmUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Password</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reset the password for <strong>{resetConfirmUser?.full_name}</strong>? A new temporary password will be generated.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetPassword} disabled={resetPassword.isPending}>
+              {resetPassword.isPending ? 'Resetting...' : 'Reset Password'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Generated Password Display */}
+      <Dialog open={!!generatedPassword} onOpenChange={(open) => { if (!open) { setGeneratedPassword(null); setShowPassword(false); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Password Reset Successful</DialogTitle>
+            <DialogDescription>
+              A new temporary password has been generated for <strong>{resetPasswordUserName}</strong>. Copy it now — it will not be shown again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 rounded-md border bg-muted px-3 py-2 font-mono text-sm">
+                {showPassword ? generatedPassword : '••••••••••••••••'}
+              </div>
+              <Button variant="outline" size="icon" onClick={() => setShowPassword(!showPassword)}>
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </Button>
+              <Button variant="outline" size="icon" onClick={copyPassword}>
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              ⚠️ This password will not be shown again. Please share it securely with the user.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => { setGeneratedPassword(null); setShowPassword(false); }}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
