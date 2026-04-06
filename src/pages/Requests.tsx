@@ -326,6 +326,12 @@ export default function Requests() {
                                   Edit
                                 </DropdownMenuItem>
                               )}
+                              {canRequestChange(request) && (
+                                <DropdownMenuItem onClick={() => setChangeRequest(request)}>
+                                  <PenLine className="h-4 w-4 mr-2" />
+                                  Request Change
+                                </DropdownMenuItem>
+                              )}
                               {canCancel(request.status) && (
                                 <DropdownMenuItem 
                                   onClick={() => handleCancel(request.id)}
