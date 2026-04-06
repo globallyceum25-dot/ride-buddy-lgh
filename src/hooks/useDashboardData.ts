@@ -235,21 +235,26 @@ export function useRecentActivity(limit: number = 5) {
   });
 }
 
-export function usePendingApprovalsPreview(limit: number = 3) {
+export function usePendingApprovalsPreview(limit: number = 3, isAdmin = false) {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: ['pending-approvals-preview', user?.id, limit],
+    queryKey: ['pending-approvals-preview', user?.id, limit, isAdmin],
     queryFn: async (): Promise<PendingApprovalItem[]> => {
       if (!user?.id) return [];
 
-      const { data: requests, error } = await supabase
+      let query = supabase
         .from('travel_requests')
         .select('id, request_number, purpose, created_at, requester_id')
-        .eq('approver_id', user.id)
         .eq('status', 'pending_approval')
         .order('created_at', { ascending: false })
         .limit(limit);
+
+      if (!isAdmin) {
+        query = query.eq('approver_id', user.id);
+      }
+
+      const { data: requests, error } = await query;
 
       if (error) throw error;
       if (!requests || requests.length === 0) return [];
