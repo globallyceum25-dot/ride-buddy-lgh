@@ -1,46 +1,36 @@
 
 
-# Auto-Generate Temporary Password on User Creation
+# Enable Admin Full Visibility Across Requests and Approvals
 
-## Approach
-Remove the password field from the form entirely. Generate a cryptographically secure temporary password server-side in the edge function, return it in the response, and display it to the admin in a confirmation dialog with a copy button. This follows NIST SP 800-63B guidelines (server-generated initial secrets, forced change on first login).
+## Problem
+- **Requests page**: Already works for admins via RLS (admins see all rows), but the query doesn't filter by `requester_id`, so this is fine.
+- **Approvals page**: Hooks (`usePendingApprovals`, `useApprovalRequests`) filter by `approver_id = user.id` in the query, so admins only see requests where they are the assigned approver — not all requests system-wide.
+- **Dashboard**: `usePendingApprovalsPreview` and `usePendingApprovalsCount` also filter by `approver_id = user.id`.
+
+## Approach (RBAC / Least Privilege)
+Check if the current user is an admin (`isAdmin()` from AuthContext). If so, skip the `approver_id` filter so they see all records. RLS already grants admins full SELECT access, so this is safe — we just need to stop artificially narrowing the query client-side.
 
 ## Changes
 
-### 1. `supabase/functions/admin-create-user/index.ts`
-- Remove `password` from required fields validation
-- Generate a 16-character password server-side using `crypto.getRandomValues()` with uppercase, lowercase, digits, and symbols (meets OWASP complexity requirements)
-- Return the generated password in the response so the admin can share it with the user
+### 1. `src/hooks/useRequests.ts`
+- **`usePendingApprovals()`**: Accept `isAdmin` flag. If admin, omit the `.eq('approver_id', user.id)` filter so all pending_approval requests are returned.
+- **`useApprovalRequests()`**: Same pattern — skip approver_id filter for admins.
 
-### 2. `src/components/users/CreateUserDialog.tsx`
-- Remove the password field from both `emailSchema` and `phoneSchema`
-- Remove the password `<Input>` from the form
-- After successful creation, show a confirmation dialog displaying the generated password with a "Copy to Clipboard" button and a warning that it won't be shown again
-- Remove `password` from the mutation payload
+### 2. `src/hooks/useDashboardData.ts`
+- **`usePendingApprovalsPreview()`**: Skip approver_id filter for admins.
+- **`usePendingApprovalsCount()`**: Skip approver_id filter for admins.
 
-### 3. `src/hooks/useUsers.ts`
-- Remove `password` from `CreateUserData` type
-- Update the mutation call to not send password
+### 3. `src/pages/Approvals.tsx`
+- Import `useAuth` and pass `isAdmin()` result to the hooks.
+- Add a visual indicator (e.g. info banner) when viewing as admin: "Showing all requests across the organization".
 
-## Password Generation (server-side)
-```
-Characters: A-Z, a-z, 0-9, !@#$%&*
-Length: 16 characters
-Method: crypto.getRandomValues() (CSPRNG)
-Guarantees: At least 1 uppercase, 1 lowercase, 1 digit, 1 symbol
-```
-
-## UX Flow
-1. Admin fills form (no password field)
-2. Clicks "Create User"
-3. Edge function generates password, creates user, returns password
-4. Dialog shows: "User created successfully. Temporary password: `••••••••` [Copy] [Show]"
-5. Admin copies and shares password securely with the user
+### 4. `src/hooks/useChangeRequests.ts`
+- `usePendingChangeRequests()` already fetches all pending change requests without user filtering — RLS handles access. No change needed.
 
 ## Files to modify
 | File | Change |
 |------|--------|
-| `supabase/functions/admin-create-user/index.ts` | Generate password server-side, return in response |
-| `src/components/users/CreateUserDialog.tsx` | Remove password field, add post-creation password display |
-| `src/hooks/useUsers.ts` | Remove password from CreateUserData type |
+| `src/hooks/useRequests.ts` | Skip approver_id filter when admin |
+| `src/hooks/useDashboardData.ts` | Skip approver_id filter when admin |
+| `src/pages/Approvals.tsx` | Pass isAdmin flag, add admin context banner |
 
