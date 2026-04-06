@@ -27,6 +27,9 @@ import { usePendingApprovals, useApprovalRequests, TravelRequest } from '@/hooks
 import { usePendingChangeRequests, ChangeRequest } from '@/hooks/useChangeRequests';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 
 type RequestStatus = Database['public']['Enums']['request_status'];
 
