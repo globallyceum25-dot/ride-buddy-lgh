@@ -123,6 +123,18 @@ Deno.serve(async (req) => {
           })
         : "TBD";
       bodyText = `An immediate travel request ${details.requestNumber} requires allocation.\n\nRoute: ${details.route}\nRequester: ${details.requesterName || "N/A"}\nPickup: ${pickupStr}\nPurpose: ${details.purpose || "N/A"}`;
+    } else if (type === "change_request_submitted") {
+      const changeLabel = details.changeType === 'reschedule' ? 'Reschedule' : details.changeType === 'passenger_update' ? 'Passenger Update' : 'Cancellation';
+      subject = `Travel Request ${details.requestNumber} - Change Request: ${changeLabel}`;
+      bodyText = `A change request (${changeLabel}) has been submitted for travel request ${details.requestNumber}.\n\nRoute: ${details.route}\nReason: ${details.reason || "N/A"}`;
+    } else if (type === "change_request_approved") {
+      const changeLabel = details.changeType === 'reschedule' ? 'Reschedule' : details.changeType === 'passenger_update' ? 'Passenger Update' : 'Cancellation';
+      subject = `Travel Request ${details.requestNumber} - Change Request Approved`;
+      bodyText = `Your change request (${changeLabel}) for travel request ${details.requestNumber} has been approved.\n\nRoute: ${details.route}${details.reviewNotes ? `\nNotes: ${details.reviewNotes}` : ''}`;
+    } else if (type === "change_request_rejected") {
+      const changeLabel = details.changeType === 'reschedule' ? 'Reschedule' : details.changeType === 'passenger_update' ? 'Passenger Update' : 'Cancellation';
+      subject = `Travel Request ${details.requestNumber} - Change Request Rejected`;
+      bodyText = `Your change request (${changeLabel}) for travel request ${details.requestNumber} has been rejected.\n\nRoute: ${details.route}${details.reviewNotes ? `\nReason: ${details.reviewNotes}` : ''}`;
     } else {
       const isClose = type === "overdue_closed";
       const actionLabel = isClose ? "Closed" : "Rescheduled";
