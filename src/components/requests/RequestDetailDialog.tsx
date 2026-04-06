@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -7,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
@@ -21,12 +23,17 @@ import {
   Phone,
   BadgeCheck,
   Circle,
-  Route
+  Route,
+  PenLine,
+  XCircle,
 } from 'lucide-react';
 import { RequestStatusBadge } from './RequestStatusBadge';
 import { RequestPriorityBadge } from './RequestPriorityBadge';
 import { useRequest, TravelRequest, RequestHistory } from '@/hooks/useRequests';
+import { useChangeRequestsForRequest } from '@/hooks/useChangeRequests';
+import { useAuth } from '@/contexts/AuthContext';
 import { RouteMapPreview } from './RouteMapPreview';
+import { ChangeRequestDialog } from './ChangeRequestDialog';
 
 interface RequestDetailDialogProps {
   open: boolean;
