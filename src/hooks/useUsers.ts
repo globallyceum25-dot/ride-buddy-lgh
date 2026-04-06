@@ -26,7 +26,6 @@ export interface UserWithDetails {
 interface CreateUserData {
   identifier_type?: 'email' | 'phone';
   email?: string;
-  password: string;
   full_name: string;
   phone?: string;
   employee_id?: string;
