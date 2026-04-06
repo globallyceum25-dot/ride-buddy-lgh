@@ -64,6 +64,7 @@ export default function Requests() {
     statusFilter === 'all' ? undefined : statusFilter
   );
   const cancelRequest = useCancelRequest();
+  const { data: pendingChangeIds } = useMyPendingChangeRequestIds();
 
   const canRequestChange = (r: TravelRequest) => r.status === 'approved';
 
