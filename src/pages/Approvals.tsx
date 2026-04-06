@@ -305,6 +305,15 @@ export default function Approvals() {
                   <XCircle className="h-4 w-4 mr-2" />
                   Rejected
                 </TabsTrigger>
+                <TabsTrigger value="changes" className="gap-2">
+                  <PenLine className="h-4 w-4" />
+                  Change Requests
+                  {pendingChanges.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {pendingChanges.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="pending">
@@ -333,6 +342,50 @@ export default function Approvals() {
                   false
                 )}
               </TabsContent>
+
+              <TabsContent value="changes">
+                {loadingChanges ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-muted-foreground">Loading...</p>
+                  </div>
+                ) : pendingChanges.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <PenLine className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No pending change requests</h3>
+                    <p className="text-muted-foreground">Change requests from users will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingChanges.map((cr) => {
+                      const changeLabel = cr.change_type === 'reschedule' ? 'Reschedule' : cr.change_type === 'passenger_update' ? 'Passenger Update' : 'Cancellation';
+                      return (
+                        <Card key={cr.id}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-sm">{cr.travel_request?.request_number}</span>
+                                  <Badge variant="secondary" className="text-xs">{changeLabel}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {cr.requester?.full_name} — {cr.travel_request?.pickup_location_name || cr.travel_request?.pickup_location} → {cr.travel_request?.dropoff_location_name || cr.travel_request?.dropoff_location}
+                                </p>
+                                <p className="text-sm">{cr.reason}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Submitted {format(new Date(cr.created_at), 'PPp')}
+                                </p>
+                              </div>
+                              <Button size="sm" onClick={() => setSelectedChangeRequest(cr)}>
+                                Review
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
@@ -343,6 +396,13 @@ export default function Approvals() {
         open={!!selectedRequestId}
         onOpenChange={(open) => !open && setSelectedRequestId(null)}
         requestId={selectedRequestId}
+      />
+
+      {/* Review Change Request Dialog */}
+      <ReviewChangeRequestDialog
+        open={!!selectedChangeRequest}
+        onOpenChange={(open) => !open && setSelectedChangeRequest(null)}
+        changeRequest={selectedChangeRequest}
       />
     </DashboardLayout>
   );
