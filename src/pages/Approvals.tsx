@@ -32,12 +32,14 @@ type RequestStatus = Database['public']['Enums']['request_status'];
 
 export default function Approvals() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [selectedChangeRequest, setSelectedChangeRequest] = useState<ChangeRequest | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected' | 'changes'>('pending');
   const isMobile = useIsMobile();
 
   const { data: pendingRequests = [], isLoading: loadingPending } = usePendingApprovals();
   const { data: approvedRequests = [], isLoading: loadingApproved } = useApprovalRequests('approved' as RequestStatus);
   const { data: rejectedRequests = [], isLoading: loadingRejected } = useApprovalRequests('rejected' as RequestStatus);
+  const { data: pendingChanges = [], isLoading: loadingChanges } = usePendingChangeRequests();
 
   const renderMobileCards = (
     requests: TravelRequest[],
