@@ -39,21 +39,12 @@ export function usePublicFormLink(token: string | undefined) {
       if (!token) throw new Error('No token provided');
       
       const { data, error } = await supabase
-        .from('public_form_links')
-        .select('id, name, description, is_active, expires_at')
-        .eq('token', token)
-        .eq('is_active', true)
-        .maybeSingle();
+        .rpc('get_public_form_link', { _token: token });
 
       if (error) throw error;
-      if (!data) throw new Error('Invalid or expired link');
-      
-      // Check expiry
-      if (data.expires_at && new Date(data.expires_at) < new Date()) {
-        throw new Error('This form link has expired');
-      }
+      if (!data || data.length === 0) throw new Error('Invalid or expired link');
 
-      return data;
+      return data[0];
     },
     enabled: !!token,
     retry: false,

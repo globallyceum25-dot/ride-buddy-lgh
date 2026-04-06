@@ -927,6 +927,32 @@ export type Database = {
         Args: { _request_id: string; _user_id: string }
         Returns: boolean
       }
+      get_public_form_link: {
+        Args: { _token: string }
+        Returns: {
+          default_approver_id: string
+          department_id: string
+          description: string
+          expires_at: string
+          id: string
+          is_active: boolean
+          name: string
+        }[]
+      }
+      get_requester_profile: {
+        Args: { _requester_user_id: string }
+        Returns: {
+          cost_center: string
+          department: string
+          email: string
+          employee_id: string
+          full_name: string
+          id: string
+          is_active: boolean
+          phone: string
+          user_id: string
+        }[]
+      }
       get_user_roles: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"][]
