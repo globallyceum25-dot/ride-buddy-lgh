@@ -47,7 +47,7 @@ export function useChangeRequestsForRequest(requestId?: string) {
     queryKey: ['change-requests', 'by-request', requestId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('request_change_requests')
+        .from('request_change_requests' as any)
         .select('*')
         .eq('request_id', requestId!)
         .order('created_at', { ascending: false });
@@ -65,7 +65,7 @@ export function usePendingChangeRequests() {
     queryKey: ['change-requests', 'pending'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('request_change_requests')
+        .from('request_change_requests' as any)
         .select('*')
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
@@ -181,7 +181,7 @@ export function useReviewChangeRequest() {
     }) => {
       // Fetch the change request
       const { data: cr, error: crError } = await supabase
-        .from('request_change_requests')
+        .from('request_change_requests' as any)
         .select('*')
         .eq('id', changeRequestId)
         .single();
@@ -190,7 +190,7 @@ export function useReviewChangeRequest() {
 
       // Update change request status
       const { error: updateError } = await supabase
-        .from('request_change_requests')
+        .from('request_change_requests' as any)
         .update({
           status: action,
           reviewed_by: user!.id,
