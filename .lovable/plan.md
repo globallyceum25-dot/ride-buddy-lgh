@@ -1,60 +1,63 @@
 
 
-# Allow User Creation by Email or Phone Number
+# Tighten Security to International Standards
 
-## Current State
-The system only supports creating users via email + password. The edge function and form both require an email address. Supabase Auth supports phone-based authentication natively via `admin.createUser({ phone, password })`.
+This plan addresses all 7 findings from the security scan, covering OWASP Top 10 categories: broken access control, injection, security misconfiguration, and audit integrity.
 
-## Approach
-Add an "identifier type" toggle (Email / Phone) to the create user form. When "Phone" is selected, the email field is replaced with a phone field, and Supabase creates the user with phone as the primary identifier. A generated placeholder email is stored in the profile for display purposes.
+## Changes Overview
 
-## Changes
+### 1. Fix Build Errors (TypeScript `error` is `unknown`)
+- **`send-notification/index.ts` line 212**: Change `error.message` to `(error as Error).message`
+- **`telegram-webhook/index.ts` line 97**: Same fix
 
-### 1. `src/components/users/CreateUserDialog.tsx`
-- Add a toggle/radio group at the top: "Create by Email" vs "Create by Phone"
-- Use a discriminated zod schema:
-  - Email mode: requires `email` (valid email) + `password`
-  - Phone mode: requires `phone` (required, E.164 format) + `password`; email becomes optional
-- Conditionally render the email or phone field as the primary identifier
-- Pass `identifier_type: 'email' | 'phone'` to the mutation
+### 2. Fix RLS: Drivers & Vehicles Exposed to Anonymous Users (CRITICAL)
+**Migration** to drop and recreate policies scoped to `authenticated` instead of `public`:
+```sql
+DROP POLICY "Authenticated users can view active drivers" ON drivers;
+DROP POLICY "Drivers can view their own record" ON drivers;
+DROP POLICY "Admins can manage drivers" ON drivers;
+CREATE POLICY "Authenticated users can view active drivers" ON drivers FOR SELECT TO authenticated USING (is_active = true);
+CREATE POLICY "Drivers can view their own record" ON drivers FOR SELECT TO authenticated USING (user_id = auth.uid());
+CREATE POLICY "Admins can manage drivers" ON drivers FOR ALL TO authenticated USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
 
-### 2. `src/hooks/useUsers.ts`
-- Update `CreateUserData` interface to include `identifier_type?: 'email' | 'phone'`
-- Pass `identifier_type` to the edge function payload
-
-### 3. `supabase/functions/admin-create-user/index.ts`
-- Accept `identifier_type` field (default: `'email'`)
-- When `identifier_type === 'phone'`:
-  - Validate phone is present and in E.164 format
-  - Call `admin.createUser({ phone, password, phone_confirm: true, email (optional), user_metadata })`
-  - If no email provided, generate a placeholder like `phone_<sanitized>@noemail.local` for the profile
-- When `identifier_type === 'email'` (default): keep current behavior unchanged
-- Update validation to make email optional when identifier_type is phone
-
-### 4. Supabase Auth Config
-- Phone auth provider must be enabled in the Supabase dashboard for phone-based users to log in. The user creation via admin API will work regardless, but login requires the provider to be enabled.
-
-## UI Preview
-```text
-┌─ Create New User ──────────────────┐
-│                                    │
-│  Create by:  (●) Email  ( ) Phone  │
-│                                    │
-│  Email *         [user@example.com]│  ← shown in email mode
-│  -- OR --                          │
-│  Phone Number *  [+94771234567   ] │  ← shown in phone mode
-│  Email (optional)[              ]  │
-│                                    │
-│  Temporary Password * [••••••••]   │
-│  Full Name *      [John Doe     ]  │
-│  ...rest of form unchanged...      │
-└────────────────────────────────────┘
+DROP POLICY "Authenticated users can view active vehicles" ON vehicles;
+DROP POLICY "Admins can manage vehicles" ON vehicles;
+CREATE POLICY "Authenticated users can view active vehicles" ON vehicles FOR SELECT TO authenticated USING (is_active = true);
+CREATE POLICY "Admins can manage vehicles" ON vehicles FOR ALL TO authenticated USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
 ```
 
-## Files to modify
+### 3. Fix send-notification: Add JWT Validation (CRITICAL)
+Currently only checks `Bearer ` prefix. Add proper JWT validation:
+- Create a user client with the caller's auth header
+- Call `getClaims(token)` to verify the JWT is valid
+- Reject if no valid user — prevents phishing via anon key
+
+### 4. Fix request_history & audit_logs: Tighten INSERT Policies
+**Migration**:
+- `request_history`: Change from `{public}` to `{authenticated}`, add ownership check (user must be requester, approver, or admin of the referenced request)
+- `audit_logs`: Remove `user_id IS NULL` branch — require `user_id = auth.uid()`
+
+### 5. Fix request_stops: Scope Guest Stop Insertion
+**Migration**: Drop the overly permissive `"Allow stops for guest requests"` policy on `request_stops`. The `submit-public-request` edge function already uses the service-role key to insert stops, so this anon policy is unnecessary.
+
+### 6. Fix user_roles: Ensure No Self-Assignment
+The current `ALL` policy for group_admin is correct, but add an explicit DENY for non-admins:
+- Add a restrictive INSERT policy: only group_admins can insert roles (already covered by ALL policy, but make it explicit by ensuring no other path exists)
+
+### 7. Telegram Webhook: Add Bot Token Verification
+Validate incoming requests by checking a secret header or comparing the bot token, preventing spoofed webhook calls.
+
+## Files to Modify
+
 | File | Change |
 |------|--------|
-| `src/components/users/CreateUserDialog.tsx` | Add identifier type toggle, conditional fields |
-| `src/hooks/useUsers.ts` | Add `identifier_type` to `CreateUserData` |
-| `supabase/functions/admin-create-user/index.ts` | Support phone-based user creation |
+| `supabase/functions/send-notification/index.ts` | Add JWT validation via `getClaims()`, fix `error` type |
+| `supabase/functions/telegram-webhook/index.ts` | Add webhook secret verification, fix `error` type |
+| Migration SQL | Fix 6 RLS policies across `drivers`, `vehicles`, `request_history`, `audit_logs`, `request_stops` |
+
+## What This Achieves
+- OWASP A01 (Broken Access Control): All anonymous data exposure eliminated
+- OWASP A04 (Insecure Design): Notification phishing vector closed
+- OWASP A07 (Authentication Failures): JWT properly validated in all edge functions
+- OWASP A09 (Logging/Monitoring): Audit trail integrity restored
 
