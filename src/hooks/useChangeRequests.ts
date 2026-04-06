@@ -181,13 +181,14 @@ export function useReviewChangeRequest() {
       reviewNotes?: string;
     }) => {
       // Fetch the change request
-      const { data: cr, error: crError } = await supabase
+      const { data: crRaw, error: crError } = await (supabase
         .from('request_change_requests' as any)
         .select('*')
         .eq('id', changeRequestId)
-        .single();
+        .single() as any);
 
-      if (crError || !cr) throw new Error('Change request not found');
+      if (crError || !crRaw) throw new Error('Change request not found');
+      const cr = crRaw as ChangeRequest;
 
       // Update change request status
       const { error: updateError } = await supabase
