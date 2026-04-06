@@ -19,6 +19,8 @@ interface NotificationPayload {
     pickupDatetime?: string;
     requesterName?: string;
     purpose?: string;
+    changeType?: string;
+    reviewNotes?: string;
   };
 }
 

@@ -361,6 +361,11 @@ export default function Requests() {
         onOpenChange={(open) => !open && setViewRequestId(null)}
         requestId={viewRequestId}
       />
+      <ChangeRequestDialog
+        open={!!changeRequest}
+        onOpenChange={(open) => !open && setChangeRequest(null)}
+        request={changeRequest}
+      />
     </DashboardLayout>
   );
 }
