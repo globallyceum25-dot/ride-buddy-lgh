@@ -6,13 +6,14 @@ import {
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAddUserRole, useRemoveUserRole, UserWithDetails, AppRole } from '@/hooks/useUsers';
+import { useAuth } from '@/contexts/AuthContext';
 
-const ALL_ROLES: { value: AppRole; label: string; description: string }[] = [
+const ALL_ROLES: { value: AppRole; label: string; description: string; adminOnly?: boolean }[] = [
   { value: 'staff', label: 'Staff', description: 'Can request rides and view own trips' },
   { value: 'driver', label: 'Driver', description: 'Can be assigned to drive trips' },
   { value: 'approver', label: 'Approver', description: 'Can approve or reject trip requests' },
-  { value: 'location_coordinator', label: 'Location Coordinator', description: 'Manages vehicles and drivers at a location' },
-  { value: 'group_admin', label: 'Group Admin', description: 'Full system access' },
+  { value: 'location_coordinator', label: 'Location Coordinator', description: 'Manages vehicles and drivers at a location', adminOnly: true },
+  { value: 'group_admin', label: 'Group Admin', description: 'Full system access', adminOnly: true },
 ];
 
 interface RoleManagementDialogProps {
