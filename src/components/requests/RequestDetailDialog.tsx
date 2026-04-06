@@ -411,6 +411,50 @@ export function RequestDetailDialog({
                 </>
               )}
 
+              {/* Pending Change Requests */}
+              {changeRequests.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Change Requests
+                    </h4>
+                    <div className="space-y-2">
+                      {changeRequests.map((cr) => (
+                        <div key={cr.id} className="bg-muted/50 p-3 rounded-md text-sm space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={cr.status === 'pending' ? 'secondary' : cr.status === 'approved' ? 'default' : 'destructive'} className="text-xs">
+                              {cr.status}
+                            </Badge>
+                            <span className="font-medium capitalize">{cr.change_type.replace('_', ' ')}</span>
+                            <span className="text-muted-foreground text-xs ml-auto">
+                              {format(new Date(cr.created_at), 'PPp')}
+                            </span>
+                          </div>
+                          <p className="text-muted-foreground">{cr.reason}</p>
+                          {cr.review_notes && (
+                            <p className="text-xs text-muted-foreground italic">Review: {cr.review_notes}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Action Buttons */}
+              {canRequestChange && !hasPendingChange && (
+                <>
+                  <Separator />
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setChangeDialogOpen(true)}>
+                      <PenLine className="h-4 w-4 mr-2" />
+                      Request Change
+                    </Button>
+                  </div>
+                </>
+              )}
+
               {/* History Timeline */}
               {history.length > 0 && (
                 <>
