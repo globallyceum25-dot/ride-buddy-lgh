@@ -54,6 +54,7 @@ const statusOptions: { value: RequestStatus | 'all'; label: string }[] = [
 export default function Requests() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [viewRequestId, setViewRequestId] = useState<string | null>(null);
+  const [changeRequest, setChangeRequest] = useState<TravelRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const isMobile = useIsMobile();
@@ -62,6 +63,8 @@ export default function Requests() {
     statusFilter === 'all' ? undefined : statusFilter
   );
   const cancelRequest = useCancelRequest();
+
+  const canRequestChange = (r: TravelRequest) => r.status === 'approved';
 
   const filteredRequests = requests.filter((request) => {
     if (!searchQuery) return true;
