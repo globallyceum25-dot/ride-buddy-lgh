@@ -430,6 +430,62 @@ export type Database = {
           },
         ]
       }
+      request_change_requests: {
+        Row: {
+          change_type: string
+          created_at: string | null
+          current_values: Json
+          id: string
+          reason: string
+          request_id: string
+          requested_by: string
+          requested_values: Json
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          change_type: string
+          created_at?: string | null
+          current_values: Json
+          id?: string
+          reason: string
+          request_id: string
+          requested_by: string
+          requested_values: Json
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          change_type?: string
+          created_at?: string | null
+          current_values?: Json
+          id?: string
+          reason?: string
+          request_id?: string
+          requested_by?: string
+          requested_values?: Json
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_change_requests_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "travel_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       request_history: {
         Row: {
           action: string

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -7,6 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
@@ -21,12 +23,17 @@ import {
   Phone,
   BadgeCheck,
   Circle,
-  Route
+  Route,
+  PenLine,
+  XCircle,
 } from 'lucide-react';
 import { RequestStatusBadge } from './RequestStatusBadge';
 import { RequestPriorityBadge } from './RequestPriorityBadge';
 import { useRequest, TravelRequest, RequestHistory } from '@/hooks/useRequests';
+import { useChangeRequestsForRequest } from '@/hooks/useChangeRequests';
+import { useAuth } from '@/contexts/AuthContext';
 import { RouteMapPreview } from './RouteMapPreview';
+import { ChangeRequestDialog } from './ChangeRequestDialog';
 
 interface RequestDetailDialogProps {
   open: boolean;
@@ -67,6 +74,9 @@ export function RequestDetailDialog({
   requestId 
 }: RequestDetailDialogProps) {
   const { data, isLoading } = useRequest(requestId || undefined);
+  const { data: changeRequests = [] } = useChangeRequestsForRequest(requestId || undefined);
+  const { user } = useAuth();
+  const [changeDialogOpen, setChangeDialogOpen] = useState(false);
 
   if (!requestId) return null;
 
@@ -74,6 +84,11 @@ export function RequestDetailDialog({
   const passengers = data?.passengers || [];
   const history = data?.history || [];
   const stops = data?.stops || [];
+
+  // Determine if user can request changes (owner, approved, no active allocation)
+  const isOwner = request?.requester_id === user?.id;
+  const canRequestChange = isOwner && request?.status === 'approved';
+  const hasPendingChange = changeRequests.some(cr => cr.status === 'pending');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -396,6 +411,50 @@ export function RequestDetailDialog({
                 </>
               )}
 
+              {/* Pending Change Requests */}
+              {changeRequests.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      Change Requests
+                    </h4>
+                    <div className="space-y-2">
+                      {changeRequests.map((cr) => (
+                        <div key={cr.id} className="bg-muted/50 p-3 rounded-md text-sm space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Badge variant={cr.status === 'pending' ? 'secondary' : cr.status === 'approved' ? 'default' : 'destructive'} className="text-xs">
+                              {cr.status}
+                            </Badge>
+                            <span className="font-medium capitalize">{cr.change_type.replace('_', ' ')}</span>
+                            <span className="text-muted-foreground text-xs ml-auto">
+                              {format(new Date(cr.created_at), 'PPp')}
+                            </span>
+                          </div>
+                          <p className="text-muted-foreground">{cr.reason}</p>
+                          {cr.review_notes && (
+                            <p className="text-xs text-muted-foreground italic">Review: {cr.review_notes}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Action Buttons */}
+              {canRequestChange && !hasPendingChange && (
+                <>
+                  <Separator />
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setChangeDialogOpen(true)}>
+                      <PenLine className="h-4 w-4 mr-2" />
+                      Request Change
+                    </Button>
+                  </div>
+                </>
+              )}
+
               {/* History Timeline */}
               {history.length > 0 && (
                 <>
@@ -420,6 +479,14 @@ export function RequestDetailDialog({
           )}
         </ScrollArea>
       </DialogContent>
+
+      {request && (
+        <ChangeRequestDialog
+          open={changeDialogOpen}
+          onOpenChange={setChangeDialogOpen}
+          request={request}
+        />
+      )}
     </Dialog>
   );
 }

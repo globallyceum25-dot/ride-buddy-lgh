@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Eye, Edit, X, FileText, Zap } from 'lucide-react';
+import { Plus, Eye, Edit, X, FileText, Zap, PenLine } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +33,7 @@ import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
 import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
 import { useMyRequests, useCancelRequest, TravelRequest } from '@/hooks/useRequests';
+import { ChangeRequestDialog } from '@/components/requests/ChangeRequestDialog';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -53,6 +54,7 @@ const statusOptions: { value: RequestStatus | 'all'; label: string }[] = [
 export default function Requests() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [viewRequestId, setViewRequestId] = useState<string | null>(null);
+  const [changeRequest, setChangeRequest] = useState<TravelRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const isMobile = useIsMobile();
@@ -61,6 +63,8 @@ export default function Requests() {
     statusFilter === 'all' ? undefined : statusFilter
   );
   const cancelRequest = useCancelRequest();
+
+  const canRequestChange = (r: TravelRequest) => r.status === 'approved';
 
   const filteredRequests = requests.filter((request) => {
     if (!searchQuery) return true;
@@ -124,6 +128,11 @@ export default function Requests() {
                   </DropdownMenuItem>
                   {canEdit(request.status) && (
                     <DropdownMenuItem><Edit className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
+                  )}
+                  {canRequestChange(request) && (
+                    <DropdownMenuItem onClick={() => setChangeRequest(request)}>
+                      <PenLine className="h-4 w-4 mr-2" />Request Change
+                    </DropdownMenuItem>
                   )}
                   {canCancel(request.status) && (
                     <DropdownMenuItem onClick={() => handleCancel(request.id)} className="text-destructive">
@@ -317,6 +326,12 @@ export default function Requests() {
                                   Edit
                                 </DropdownMenuItem>
                               )}
+                              {canRequestChange(request) && (
+                                <DropdownMenuItem onClick={() => setChangeRequest(request)}>
+                                  <PenLine className="h-4 w-4 mr-2" />
+                                  Request Change
+                                </DropdownMenuItem>
+                              )}
                               {canCancel(request.status) && (
                                 <DropdownMenuItem 
                                   onClick={() => handleCancel(request.id)}
@@ -345,6 +360,11 @@ export default function Requests() {
         open={!!viewRequestId} 
         onOpenChange={(open) => !open && setViewRequestId(null)}
         requestId={viewRequestId}
+      />
+      <ChangeRequestDialog
+        open={!!changeRequest}
+        onOpenChange={(open) => !open && setChangeRequest(null)}
+        request={changeRequest}
       />
     </DashboardLayout>
   );

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Clock, CheckCircle, XCircle, FileText } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, FileText, PenLine } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,9 +20,11 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ApprovalDialog } from '@/components/requests/ApprovalDialog';
+import { ReviewChangeRequestDialog } from '@/components/requests/ReviewChangeRequestDialog';
 import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
 import { usePendingApprovals, useApprovalRequests, TravelRequest } from '@/hooks/useRequests';
+import { usePendingChangeRequests, ChangeRequest } from '@/hooks/useChangeRequests';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -30,12 +32,14 @@ type RequestStatus = Database['public']['Enums']['request_status'];
 
 export default function Approvals() {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  const [selectedChangeRequest, setSelectedChangeRequest] = useState<ChangeRequest | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected' | 'changes'>('pending');
   const isMobile = useIsMobile();
 
   const { data: pendingRequests = [], isLoading: loadingPending } = usePendingApprovals();
   const { data: approvedRequests = [], isLoading: loadingApproved } = useApprovalRequests('approved' as RequestStatus);
   const { data: rejectedRequests = [], isLoading: loadingRejected } = useApprovalRequests('rejected' as RequestStatus);
+  const { data: pendingChanges = [], isLoading: loadingChanges } = usePendingChangeRequests();
 
   const renderMobileCards = (
     requests: TravelRequest[],
@@ -301,6 +305,15 @@ export default function Approvals() {
                   <XCircle className="h-4 w-4 mr-2" />
                   Rejected
                 </TabsTrigger>
+                <TabsTrigger value="changes" className="gap-2">
+                  <PenLine className="h-4 w-4" />
+                  Change Requests
+                  {pendingChanges.length > 0 && (
+                    <Badge variant="secondary" className="ml-1">
+                      {pendingChanges.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="pending">
@@ -329,6 +342,50 @@ export default function Approvals() {
                   false
                 )}
               </TabsContent>
+
+              <TabsContent value="changes">
+                {loadingChanges ? (
+                  <div className="flex items-center justify-center py-8">
+                    <p className="text-muted-foreground">Loading...</p>
+                  </div>
+                ) : pendingChanges.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <PenLine className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium">No pending change requests</h3>
+                    <p className="text-muted-foreground">Change requests from users will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingChanges.map((cr) => {
+                      const changeLabel = cr.change_type === 'reschedule' ? 'Reschedule' : cr.change_type === 'passenger_update' ? 'Passenger Update' : 'Cancellation';
+                      return (
+                        <Card key={cr.id}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold text-sm">{cr.travel_request?.request_number}</span>
+                                  <Badge variant="secondary" className="text-xs">{changeLabel}</Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground">
+                                  {cr.requester?.full_name} — {cr.travel_request?.pickup_location_name || cr.travel_request?.pickup_location} → {cr.travel_request?.dropoff_location_name || cr.travel_request?.dropoff_location}
+                                </p>
+                                <p className="text-sm">{cr.reason}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Submitted {format(new Date(cr.created_at), 'PPp')}
+                                </p>
+                              </div>
+                              <Button size="sm" onClick={() => setSelectedChangeRequest(cr)}>
+                                Review
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
@@ -339,6 +396,13 @@ export default function Approvals() {
         open={!!selectedRequestId}
         onOpenChange={(open) => !open && setSelectedRequestId(null)}
         requestId={selectedRequestId}
+      />
+
+      {/* Review Change Request Dialog */}
+      <ReviewChangeRequestDialog
+        open={!!selectedChangeRequest}
+        onOpenChange={(open) => !open && setSelectedChangeRequest(null)}
+        changeRequest={selectedChangeRequest}
       />
     </DashboardLayout>
   );

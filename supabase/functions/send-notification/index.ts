@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface NotificationPayload {
   recipientUserId: string;
-  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned" | "trip_dispatched" | "trip_in_progress" | "approval_requested" | "immediate_allocation";
+  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned" | "trip_dispatched" | "trip_in_progress" | "approval_requested" | "immediate_allocation" | "change_request_submitted" | "change_request_approved" | "change_request_rejected";
   details: {
     requestNumber: string;
     route: string;
@@ -19,6 +19,8 @@ interface NotificationPayload {
     pickupDatetime?: string;
     requesterName?: string;
     purpose?: string;
+    changeType?: string;
+    reviewNotes?: string;
   };
 }
 
@@ -121,6 +123,18 @@ Deno.serve(async (req) => {
           })
         : "TBD";
       bodyText = `An immediate travel request ${details.requestNumber} requires allocation.\n\nRoute: ${details.route}\nRequester: ${details.requesterName || "N/A"}\nPickup: ${pickupStr}\nPurpose: ${details.purpose || "N/A"}`;
+    } else if (type === "change_request_submitted") {
+      const changeLabel = details.changeType === 'reschedule' ? 'Reschedule' : details.changeType === 'passenger_update' ? 'Passenger Update' : 'Cancellation';
+      subject = `Travel Request ${details.requestNumber} - Change Request: ${changeLabel}`;
+      bodyText = `A change request (${changeLabel}) has been submitted for travel request ${details.requestNumber}.\n\nRoute: ${details.route}\nReason: ${details.reason || "N/A"}`;
+    } else if (type === "change_request_approved") {
+      const changeLabel = details.changeType === 'reschedule' ? 'Reschedule' : details.changeType === 'passenger_update' ? 'Passenger Update' : 'Cancellation';
+      subject = `Travel Request ${details.requestNumber} - Change Request Approved`;
+      bodyText = `Your change request (${changeLabel}) for travel request ${details.requestNumber} has been approved.\n\nRoute: ${details.route}${details.reviewNotes ? `\nNotes: ${details.reviewNotes}` : ''}`;
+    } else if (type === "change_request_rejected") {
+      const changeLabel = details.changeType === 'reschedule' ? 'Reschedule' : details.changeType === 'passenger_update' ? 'Passenger Update' : 'Cancellation';
+      subject = `Travel Request ${details.requestNumber} - Change Request Rejected`;
+      bodyText = `Your change request (${changeLabel}) for travel request ${details.requestNumber} has been rejected.\n\nRoute: ${details.route}${details.reviewNotes ? `\nReason: ${details.reviewNotes}` : ''}`;
     } else {
       const isClose = type === "overdue_closed";
       const actionLabel = isClose ? "Closed" : "Rescheduled";
@@ -193,6 +207,12 @@ Deno.serve(async (req) => {
         } else if (type === "immediate_allocation") {
           const pickupStr = details.pickupDatetime ? new Date(details.pickupDatetime).toLocaleString("en-US", { dateStyle: "long", timeStyle: "short" }) : "TBD";
           telegramText = `<b>⚡ ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Requester:</b> ${details.requesterName || "N/A"}\n<b>Pickup:</b> ${pickupStr}\n<b>Purpose:</b> ${details.purpose || "N/A"}`;
+        } else if (type === "change_request_submitted") {
+          telegramText = `<b>📝 ${subject}</b>\n\n<b>Route:</b> ${details.route}\n<b>Reason:</b> ${details.reason || "N/A"}`;
+        } else if (type === "change_request_approved") {
+          telegramText = `<b>✅ ${subject}</b>\n\n<b>Route:</b> ${details.route}${details.reviewNotes ? `\n<b>Notes:</b> ${details.reviewNotes}` : ''}`;
+        } else if (type === "change_request_rejected") {
+          telegramText = `<b>❌ ${subject}</b>\n\n<b>Route:</b> ${details.route}${details.reviewNotes ? `\n<b>Reason:</b> ${details.reviewNotes}` : ''}`;
         } else {
           telegramText = `<b>🚗 ${subject}</b>\n\n${bodyText}`;
         }
