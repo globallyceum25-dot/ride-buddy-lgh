@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface NotificationPayload {
   recipientUserId: string;
-  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned" | "trip_dispatched" | "trip_in_progress" | "approval_requested" | "immediate_allocation";
+  type: "overdue_closed" | "overdue_rescheduled" | "allocation_assigned" | "trip_dispatched" | "trip_in_progress" | "approval_requested" | "immediate_allocation" | "change_request_submitted" | "change_request_approved" | "change_request_rejected";
   details: {
     requestNumber: string;
     route: string;
