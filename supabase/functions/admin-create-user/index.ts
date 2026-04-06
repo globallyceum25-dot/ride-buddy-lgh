@@ -8,7 +8,6 @@ const corsHeaders = {
 interface CreateUserRequest {
   identifier_type?: 'email' | 'phone'
   email?: string
-  password: string
   full_name: string
   phone?: string
   employee_id?: string
@@ -18,14 +17,45 @@ interface CreateUserRequest {
   primary_location_id?: string
 }
 
+function generateSecurePassword(): string {
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const lower = 'abcdefghijklmnopqrstuvwxyz'
+  const digits = '0123456789'
+  const symbols = '!@#$%&*'
+  const all = upper + lower + digits + symbols
+
+  const array = new Uint8Array(16)
+  crypto.getRandomValues(array)
+
+  // Guarantee at least one of each category
+  const guaranteed = [
+    upper[array[0] % upper.length],
+    lower[array[1] % lower.length],
+    digits[array[2] % digits.length],
+    symbols[array[3] % symbols.length],
+  ]
+
+  // Fill remaining 12 characters
+  const remaining = Array.from(array.slice(4), b => all[b % all.length])
+  const combined = [...guaranteed, ...remaining]
+
+  // Shuffle using Fisher-Yates
+  const shuffleBytes = new Uint8Array(combined.length)
+  crypto.getRandomValues(shuffleBytes)
+  for (let i = combined.length - 1; i > 0; i--) {
+    const j = shuffleBytes[i] % (i + 1);
+    [combined[i], combined[j]] = [combined[j], combined[i]]
+  }
+
+  return combined.join('')
+}
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Get authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader?.startsWith('Bearer ')) {
       console.error('Missing or invalid authorization header')
@@ -35,7 +65,6 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Create Supabase client with user's token
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -44,7 +73,6 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } }
     })
 
-    // Verify the caller's JWT and get claims
     const token = authHeader.replace('Bearer ', '')
     const { data: claimsData, error: claimsError } = await userClient.auth.getClaims(token)
     
@@ -57,11 +85,8 @@ Deno.serve(async (req) => {
     }
 
     const callerId = claimsData.claims.sub
-
-    // Create admin client for role check and user creation
     const adminClient = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Check if caller has group_admin role using database function
     const { data: isAdmin, error: roleError } = await adminClient.rpc('has_role', {
       _user_id: callerId,
       _role: 'group_admin'
@@ -83,26 +108,16 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Parse and validate request body
     const body: CreateUserRequest = await req.json()
     const identifierType = body.identifier_type || 'email'
     
-    // Common validation
-    if (!body.password || !body.full_name) {
+    if (!body.full_name) {
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: password, full_name' }),
+        JSON.stringify({ error: 'Missing required field: full_name' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    if (body.password.length < 8) {
-      return new Response(
-        JSON.stringify({ error: 'Password must be at least 8 characters' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Validate roles
     const validRoles = ['staff', 'driver', 'approver', 'location_coordinator', 'group_admin']
     if (body.roles && body.roles.length > 0) {
       for (const role of body.roles) {
@@ -115,11 +130,13 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Generate secure temporary password server-side
+    const temporaryPassword = generateSecurePassword()
+
     let authData
     let profileEmail: string
 
     if (identifierType === 'phone') {
-      // Phone-based creation
       if (!body.phone) {
         return new Response(
           JSON.stringify({ error: 'Phone number is required for phone-based user creation' }),
@@ -127,7 +144,6 @@ Deno.serve(async (req) => {
         )
       }
 
-      // Validate E.164 format
       const phoneRegex = /^\+[1-9]\d{6,14}$/
       if (!phoneRegex.test(body.phone)) {
         return new Response(
@@ -136,21 +152,19 @@ Deno.serve(async (req) => {
         )
       }
 
-      // Use provided email or generate placeholder
       profileEmail = body.email && body.email.trim() !== '' ? body.email : `phone_${body.phone.replace(/\+/g, '')}@noemail.local`
 
       console.log('Creating user with phone:', body.phone)
 
       const createUserPayload: Record<string, unknown> = {
         phone: body.phone,
-        password: body.password,
+        password: temporaryPassword,
         phone_confirm: true,
         user_metadata: {
           full_name: body.full_name
         }
       }
 
-      // Include email if provided
       if (body.email && body.email.trim() !== '') {
         createUserPayload.email = body.email
         createUserPayload.email_confirm = true
@@ -167,7 +181,6 @@ Deno.serve(async (req) => {
       }
       authData = data
     } else {
-      // Email-based creation (default)
       if (!body.email) {
         return new Response(
           JSON.stringify({ error: 'Email is required for email-based user creation' }),
@@ -189,7 +202,7 @@ Deno.serve(async (req) => {
 
       const { data, error: createError } = await adminClient.auth.admin.createUser({
         email: body.email,
-        password: body.password,
+        password: temporaryPassword,
         email_confirm: true,
         user_metadata: {
           full_name: body.full_name
@@ -209,10 +222,8 @@ Deno.serve(async (req) => {
     const newUserId = authData.user.id
     console.log('Auth user created with ID:', newUserId)
 
-    // Wait briefly for the trigger to create the profile
     await new Promise(resolve => setTimeout(resolve, 500))
 
-    // Update profile with additional fields
     const profileUpdate: Record<string, unknown> = {
       email: profileEmail,
     }
@@ -228,10 +239,8 @@ Deno.serve(async (req) => {
 
     if (profileError) {
       console.error('Error updating profile:', profileError)
-      // Non-fatal, continue with role assignment
     }
 
-    // Assign roles
     if (body.roles && body.roles.length > 0) {
       const roleInserts = body.roles.map(role => ({
         user_id: newUserId,
@@ -244,11 +253,9 @@ Deno.serve(async (req) => {
 
       if (rolesError) {
         console.error('Error assigning roles:', rolesError)
-        // Non-fatal, user was created
       }
     }
 
-    // Assign primary location if provided
     if (body.primary_location_id) {
       const { error: locationError } = await adminClient
         .from('user_locations')
@@ -260,7 +267,6 @@ Deno.serve(async (req) => {
 
       if (locationError) {
         console.error('Error assigning location:', locationError)
-        // Non-fatal, user was created
       }
     }
 
@@ -273,7 +279,8 @@ Deno.serve(async (req) => {
           id: newUserId,
           email: profileEmail,
           full_name: body.full_name
-        }
+        },
+        temporary_password: temporaryPassword
       }),
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

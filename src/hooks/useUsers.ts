@@ -26,7 +26,6 @@ export interface UserWithDetails {
 interface CreateUserData {
   identifier_type?: 'email' | 'phone';
   email?: string;
-  password: string;
   full_name: string;
   phone?: string;
   employee_id?: string;
@@ -140,10 +139,6 @@ export function useCreateUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({
-        title: 'User created',
-        description: 'The new user account has been created successfully.',
-      });
     },
     onError: (error: Error) => {
       console.error('Create user error:', error);
