@@ -36,7 +36,6 @@ import { useMyRequests, useCancelRequest, TravelRequest } from '@/hooks/useReque
 import { ChangeRequestDialog } from '@/components/requests/ChangeRequestDialog';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 type RequestStatus = Database['public']['Enums']['request_status'];
 
