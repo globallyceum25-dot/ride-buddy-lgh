@@ -242,6 +242,15 @@ export default function Approvals() {
           </p>
         </div>
 
+        {adminFlag && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              You are viewing all requests across the organization as an administrator.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Stats */}
         <div className="grid gap-4 grid-cols-3">
           <Card>

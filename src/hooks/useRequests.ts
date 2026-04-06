@@ -213,9 +213,9 @@ export function usePendingApprovals(isAdmin = false) {
 }
 
 // Fetch all approval requests (for approvers - all statuses)
-export function useApprovalRequests(statusFilter?: RequestStatus) {
+export function useApprovalRequests(statusFilter?: RequestStatus, isAdmin = false) {
   return useQuery({
-    queryKey: ['approval-requests', statusFilter],
+    queryKey: ['approval-requests', statusFilter, isAdmin],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -224,8 +224,11 @@ export function useApprovalRequests(statusFilter?: RequestStatus) {
       let query = supabase
         .from('travel_requests')
         .select('*')
-        .eq('approver_id', user.id)
         .order('created_at', { ascending: false });
+
+      if (!isAdmin) {
+        query = query.eq('approver_id', user.id);
+      }
 
       if (statusFilter) {
         query = query.eq('status', statusFilter);

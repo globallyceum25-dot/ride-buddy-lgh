@@ -281,19 +281,24 @@ export function usePendingApprovalsPreview(limit: number = 3, isAdmin = false) {
   });
 }
 
-export function usePendingApprovalsCount() {
+export function usePendingApprovalsCount(isAdmin = false) {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: ['pending-approvals-count', user?.id],
+    queryKey: ['pending-approvals-count', user?.id, isAdmin],
     queryFn: async (): Promise<number> => {
       if (!user?.id) return 0;
 
-      const { count, error } = await supabase
+      let query = supabase
         .from('travel_requests')
         .select('id', { count: 'exact', head: true })
-        .eq('approver_id', user.id)
         .eq('status', 'pending_approval');
+
+      if (!isAdmin) {
+        query = query.eq('approver_id', user.id);
+      }
+
+      const { count, error } = await query;
 
       if (error) throw error;
       return count || 0;
