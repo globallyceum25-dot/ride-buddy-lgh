@@ -108,7 +108,7 @@ export function useCreateChangeRequest() {
   return useMutation({
     mutationFn: async (input: CreateChangeRequestInput) => {
       const { data, error } = await supabase
-        .from('request_change_requests')
+        .from('request_change_requests' as any)
         .insert({
           request_id: input.request_id,
           requested_by: user!.id,
