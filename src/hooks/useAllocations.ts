@@ -63,6 +63,20 @@ export interface Allocation {
     user_id: string;
     license_number: string;
   } | null;
+  requester?: {
+    full_name: string | null;
+  } | null;
+  driverProfile?: {
+    full_name: string;
+  } | null;
+  stops?: {
+    id: string;
+    request_id: string;
+    location: string;
+    location_name: string | null;
+    stop_order: number;
+    created_at: string;
+  }[];
 }
 
 export interface TripPool {
@@ -89,6 +103,9 @@ export interface TripPool {
     user_id: string;
   } | null;
   allocations?: Allocation[];
+  driverProfile?: {
+    full_name: string;
+  } | null;
 }
 
 export interface AllocationInsert {

@@ -46,11 +46,11 @@ export function useChangeRequestsForRequest(requestId?: string) {
   return useQuery({
     queryKey: ['change-requests', 'by-request', requestId],
     queryFn: async () => {
-      const { data, error } = await (supabase
-        .from('request_change_requests' as any)
+      const { data, error } = await supabase
+        .from('request_change_requests')
         .select('*')
         .eq('request_id', requestId!)
-        .order('created_at', { ascending: false }) as any);
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       return (data || []) as ChangeRequest[];
@@ -64,11 +64,11 @@ export function usePendingChangeRequests() {
   return useQuery({
     queryKey: ['change-requests', 'pending'],
     queryFn: async () => {
-      const { data, error } = await (supabase
-        .from('request_change_requests' as any)
+      const { data, error } = await supabase
+        .from('request_change_requests')
         .select('*')
         .eq('status', 'pending')
-        .order('created_at', { ascending: false }) as any);
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       const rawData = (data || []) as ChangeRequest[];
@@ -107,11 +107,11 @@ export function useMyPendingChangeRequestIds() {
   return useQuery({
     queryKey: ['change-requests', 'my-pending-ids', user?.id],
     queryFn: async () => {
-      const { data, error } = await (supabase
-        .from('request_change_requests' as any)
+      const { data, error } = await supabase
+        .from('request_change_requests')
         .select('request_id')
         .eq('status', 'pending')
-        .eq('requested_by', user!.id) as any);
+        .eq('requested_by', user!.id);
 
       if (error) throw error;
       const ids = new Set<string>((data || []).map((r: { request_id: string }) => r.request_id));
@@ -130,7 +130,7 @@ export function useCreateChangeRequest() {
   return useMutation({
     mutationFn: async (input: CreateChangeRequestInput) => {
       const { data, error } = await supabase
-        .from('request_change_requests' as any)
+        .from('request_change_requests')
         .insert({
           request_id: input.request_id,
           requested_by: user!.id,
@@ -202,18 +202,18 @@ export function useReviewChangeRequest() {
       reviewNotes?: string;
     }) => {
       // Fetch the change request
-      const { data: crRaw, error: crError } = await (supabase
-        .from('request_change_requests' as any)
+      const { data: crRaw, error: crError } = await supabase
+        .from('request_change_requests')
         .select('*')
         .eq('id', changeRequestId)
-        .single() as any);
+        .single();
 
       if (crError || !crRaw) throw new Error('Change request not found');
       const cr = crRaw as ChangeRequest;
 
       // Update change request status
       const { error: updateError } = await supabase
-        .from('request_change_requests' as any)
+        .from('request_change_requests')
         .update({
           status: action,
           reviewed_by: user!.id,

@@ -114,7 +114,7 @@ export function KanbanBoard({ searchQuery, dateFilter }: KanbanBoardProps) {
         (a) =>
           a.request?.request_number?.toLowerCase().includes(query) ||
           a.vehicle?.registration_number?.toLowerCase().includes(query) ||
-          (a as any).requester?.full_name?.toLowerCase().includes(query)
+          a.requester?.full_name?.toLowerCase().includes(query)
       );
     }
     if (dateFilter) {

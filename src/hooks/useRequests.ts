@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Database } from '@/integrations/supabase/types';
 
-type RequestStatus = Database['public']['Enums']['request_status'];
+export type RequestStatus = Database['public']['Enums']['request_status'];
 type RequestPriority = Database['public']['Enums']['request_priority'];
 type TripType = Database['public']['Enums']['trip_type'];
 
@@ -129,7 +129,7 @@ async function fetchProfilesForUsers(userIds: string[]) {
 
 // Helper function to enrich requests with profile data
 function enrichRequestsWithProfiles(
-  requests: any[],
+  requests: Database['public']['Tables']['travel_requests']['Row'][],
   profileMap: Map<string, { full_name: string; email: string; department: string | null }>
 ): TravelRequest[] {
   return requests.map(r => ({
@@ -393,7 +393,7 @@ export function useCreateRequest() {
           pickup_location_name: pickup_location_name || null,
           dropoff_location_name: dropoff_location_name || null,
           ...(is_immediate ? { approved_at: new Date().toISOString() } : {}),
-        } as any)
+        } as Database['public']['Tables']['travel_requests']['Insert'])
         .select()
         .single();
 

@@ -18,6 +18,21 @@ export interface BusyResources {
   allocations: BusyAllocation[];
 }
 
+type AllocationRow = {
+  vehicle_id: string | null;
+  driver_id: string | null;
+  status: string | null;
+  scheduled_pickup: string;
+  travel_requests: {
+    request_number: string | null;
+    pickup_location: string | null;
+    dropoff_location: string | null;
+  } | null;
+  trip_pools: {
+    pool_number: string | null;
+  } | null;
+};
+
 export function useBusyResources(date: string | null) {
   return useQuery<BusyResources>({
     queryKey: ['busy-resources', date],
@@ -51,7 +66,7 @@ export function useBusyResources(date: string | null) {
         return { busyVehicleIds: [], busyDriverIds: [], allocations: [] };
       }
 
-      const allocations: BusyAllocation[] = (data || []).map((a: any) => ({
+      const allocations: BusyAllocation[] = ((data ?? []) as AllocationRow[]).map((a) => ({
         vehicleId: a.vehicle_id,
         driverId: a.driver_id,
         requestNumber: a.travel_requests?.request_number || null,
