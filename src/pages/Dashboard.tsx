@@ -45,8 +45,8 @@ export default function Dashboard() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: alerts = [], isLoading: alertsLoading } = useSetupAlerts();
   const { data: recentActivity = [], isLoading: activityLoading } = useRecentActivity(5);
-  const { data: pendingApprovals = [], isLoading: approvalsLoading } = usePendingApprovalsPreview(3);
-  const { data: pendingCount = 0 } = usePendingApprovalsCount();
+  const { data: pendingApprovals = [], isLoading: approvalsLoading } = usePendingApprovalsPreview(3, isAdmin);
+  const { data: pendingCount = 0 } = usePendingApprovalsCount(isAdmin);
   const { data: driverTrips = [], isLoading: tripsLoading } = useDriverTodayTrips();
   const { data: hailingSpend, isLoading: hailingLoading } = useHailingSpendStats();
   const statsDisplay = [
