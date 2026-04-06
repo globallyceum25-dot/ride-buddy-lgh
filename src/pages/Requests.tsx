@@ -34,6 +34,7 @@ import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
 import { useMyRequests, useCancelRequest, TravelRequest } from '@/hooks/useRequests';
 import { ChangeRequestDialog } from '@/components/requests/ChangeRequestDialog';
+import { useMyPendingChangeRequestIds } from '@/hooks/useChangeRequests';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
 

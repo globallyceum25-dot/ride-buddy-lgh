@@ -100,6 +100,27 @@ export function usePendingChangeRequests() {
   });
 }
 
+// Fetch request IDs that have pending change requests (for the current user's requests)
+export function useMyPendingChangeRequestIds() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['change-requests', 'my-pending-ids', user?.id],
+    queryFn: async () => {
+      const { data, error } = await (supabase
+        .from('request_change_requests' as any)
+        .select('request_id')
+        .eq('status', 'pending')
+        .eq('requested_by', user!.id) as any);
+
+      if (error) throw error;
+      const ids = new Set<string>((data || []).map((r: { request_id: string }) => r.request_id));
+      return ids;
+    },
+    enabled: !!user?.id,
+  });
+}
+
 // Create a change request
 export function useCreateChangeRequest() {
   const queryClient = useQueryClient();
