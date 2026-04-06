@@ -34,6 +34,7 @@ import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
 import { useMyRequests, useCancelRequest, TravelRequest } from '@/hooks/useRequests';
 import { ChangeRequestDialog } from '@/components/requests/ChangeRequestDialog';
+import { useMyPendingChangeRequestIds } from '@/hooks/useChangeRequests';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -63,6 +64,7 @@ export default function Requests() {
     statusFilter === 'all' ? undefined : statusFilter
   );
   const cancelRequest = useCancelRequest();
+  const { data: pendingChangeIds } = useMyPendingChangeRequestIds();
 
   const canRequestChange = (r: TravelRequest) => r.status === 'approved';
 
@@ -98,13 +100,19 @@ export default function Requests() {
           <CardContent className="p-4">
             <div className="flex items-start justify-between gap-2 mb-2">
               <span className="font-semibold text-sm">{request.request_number}</span>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <RequestPriorityBadge priority={request.priority} />
                 <RequestStatusBadge status={request.status} />
                 {isImmediate(request) && (
                   <Badge className="bg-amber-100 text-amber-800 border-amber-300 hover:bg-amber-100 gap-1 px-1.5 py-0.5 text-[10px]">
                     <Zap className="h-3 w-3" />
                     Immediate
+                  </Badge>
+                )}
+                {pendingChangeIds?.has(request.id) && (
+                  <Badge className="bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-100 gap-1 px-1.5 py-0.5 text-[10px]">
+                    <PenLine className="h-3 w-3" />
+                    Change Pending
                   </Badge>
                 )}
               </div>
@@ -299,6 +307,21 @@ export default function Requests() {
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     <p>Immediate request — skipped approval</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {pendingChangeIds?.has(request.id) && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Badge className="bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-100 gap-1 px-1.5 py-0.5 text-[10px]">
+                                      <PenLine className="h-3 w-3" />
+                                      Change Pending
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>This request has a pending change request</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
