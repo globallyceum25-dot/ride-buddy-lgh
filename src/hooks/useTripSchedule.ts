@@ -131,7 +131,7 @@ export function useTripSchedule(filters: TripScheduleFilters) {
 
       // Get pool info for pooled trips
       const poolIds = [...new Set(filteredAllocations.map(a => a.pool_id).filter(Boolean))] as string[];
-      let poolInfo: Record<string, { number: string; requestCount: number }> = {};
+      const poolInfo: Record<string, { number: string; requestCount: number }> = {};
       
       if (poolIds.length > 0) {
         const { data: pools } = await supabase
@@ -500,7 +500,7 @@ export function useWeekTrips(weekStart: Date, filters: TripScheduleFilters = {})
 
       // Get pool info
       const poolIds = [...new Set(filteredAllocations.map(a => a.pool_id).filter(Boolean))] as string[];
-      let poolInfo: Record<string, { number: string; requestCount: number }> = {};
+      const poolInfo: Record<string, { number: string; requestCount: number }> = {};
       
       if (poolIds.length > 0) {
         const { data: pools } = await supabase

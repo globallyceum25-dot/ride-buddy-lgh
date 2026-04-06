@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCloseRequest } from '@/hooks/useRequests';
+import type { RequestStatus } from '@/hooks/useRequests';
 
 interface CloseRequestDialogProps {
   request: {
@@ -22,7 +23,7 @@ interface CloseRequestDialogProps {
     dropoff_location: string;
     pickup_location_name?: string | null;
     dropoff_location_name?: string | null;
-    status: string;
+    status: RequestStatus;
   } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,7 +36,7 @@ export function CloseRequestDialog({ request, open, onOpenChange }: CloseRequest
   const handleSubmit = () => {
     if (!request || !reason.trim()) return;
     closeRequest.mutate(
-      { id: request.id, reason: reason.trim(), fromStatus: request.status as any },
+      { id: request.id, reason: reason.trim(), fromStatus: request.status },
       {
         onSuccess: () => {
           setReason('');

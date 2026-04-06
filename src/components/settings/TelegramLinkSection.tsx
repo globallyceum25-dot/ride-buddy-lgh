@@ -43,14 +43,15 @@ export function TelegramLinkSection() {
 
       const { error } = await supabase
         .from('profiles')
-        .update({ telegram_link_code: code } as any)
+        .update({ telegram_link_code: code })
         .eq('user_id', user.id);
 
       if (error) throw error;
       setLinkCode(code);
       toast({ title: 'Code Generated', description: 'Send this code to the Telegram bot.' });
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -64,15 +65,16 @@ export function TelegramLinkSection() {
 
       const { error } = await supabase
         .from('profiles')
-        .update({ telegram_chat_id: null, telegram_link_code: null } as any)
+        .update({ telegram_chat_id: null, telegram_link_code: null })
         .eq('user_id', user.id);
 
       if (error) throw error;
       setIsLinked(false);
       setLinkCode(null);
       toast({ title: 'Unlinked', description: 'Telegram account has been unlinked.' });
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }

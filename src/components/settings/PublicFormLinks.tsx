@@ -24,6 +24,18 @@ import { CreateFormLinkDialog } from './CreateFormLinkDialog';
 
 const DEFAULT_DOMAIN = 'https://ride-buddy-lgh.lovable.app';
 
+type FormLinkWithDepartment = {
+  id: string;
+  token: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  expires_at: string | null;
+  created_at: string | null;
+  department?: { id: string; name: string; code: string } | null;
+  [key: string]: unknown;
+};
+
 export function PublicFormLinks() {
   const { data: links, isLoading } = useFormLinks();
   const { data: settings } = useSystemSettings();
@@ -126,7 +138,7 @@ export function PublicFormLinks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {links.map((link) => (
+                {(links as FormLinkWithDepartment[]).map((link) => (
                   <TableRow key={link.id}>
                     <TableCell>
                       <div>
@@ -139,9 +151,9 @@ export function PublicFormLinks() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {(link as any).department ? (
+                      {link.department ? (
                         <Badge variant="outline">
-                          {(link as any).department.name}
+                          {link.department.name}
                         </Badge>
                       ) : (
                         <span className="text-muted-foreground text-sm">—</span>

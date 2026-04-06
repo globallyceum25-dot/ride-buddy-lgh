@@ -38,17 +38,19 @@ import {
   checkPoolCompatibility, Allocation, HAILING_SERVICE_LABELS
 } from '@/hooks/useAllocations';
 
+type PendingRequest = NonNullable<ReturnType<typeof usePendingAllocation>['data']>[number];
+
 export default function Allocations() {
   const [viewMode, setViewMode] = useState<ViewMode>('board');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
-  const [assignDialogRequest, setAssignDialogRequest] = useState<any>(null);
+  const [assignDialogRequest, setAssignDialogRequest] = useState<PendingRequest | null>(null);
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [trackingAllocation, setTrackingAllocation] = useState<Allocation | null>(null);
   const [trackingMode, setTrackingMode] = useState<'start' | 'complete'>('start');
-  const [closeDialogRequest, setCloseDialogRequest] = useState<any>(null);
-  const [rescheduleDialogRequest, setRescheduleDialogRequest] = useState<any>(null);
+  const [closeDialogRequest, setCloseDialogRequest] = useState<PendingRequest | null>(null);
+  const [rescheduleDialogRequest, setRescheduleDialogRequest] = useState<PendingRequest | null>(null);
   const [editCostAllocation, setEditCostAllocation] = useState<Allocation | null>(null);
 
   const isMobile = useIsMobile();
@@ -123,10 +125,10 @@ export default function Allocations() {
               </div>
               <RouteDisplay 
                 pickup={request.pickup_location} 
-                pickupName={(request as any).pickup_location_name}
+                pickupName={request.pickup_location_name}
                 destination={request.dropoff_location}
-                destinationName={(request as any).dropoff_location_name}
-                stops={(request as any).stops}
+                destinationName={request.dropoff_location_name}
+                stops={request.stops}
               />
               <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
                 {format(new Date(request.pickup_datetime), 'MMM d, yyyy · h:mm a')}
@@ -192,15 +194,15 @@ export default function Allocations() {
             </p>
             {!allocation.hailing_service && (
               <p className="text-sm text-muted-foreground">
-                Driver: {(allocation as any).driverProfile?.full_name || '—'}
+                Driver: {allocation.driverProfile?.full_name || '—'}
               </p>
             )}
             <RouteDisplay 
               pickup={allocation.request?.pickup_location || ''} 
-              pickupName={(allocation.request as any)?.pickup_location_name}
+              pickupName={allocation.request?.pickup_location_name}
               destination={allocation.request?.dropoff_location || ''}
-              destinationName={(allocation.request as any)?.dropoff_location_name}
-              stops={(allocation as any).stops}
+              destinationName={allocation.request?.dropoff_location_name}
+              stops={allocation.stops}
             />
             <div className="flex items-center justify-between mt-3">
               <span className="text-xs text-muted-foreground">
@@ -258,7 +260,7 @@ export default function Allocations() {
               {pool.vehicle?.registration_number || '—'}
               {pool.vehicle && <span className="text-muted-foreground text-xs ml-1">{pool.vehicle.make} {pool.vehicle.model}</span>}
             </p>
-            <p className="text-sm text-muted-foreground">Driver: {(pool as any).driverProfile?.full_name || '—'}</p>
+            <p className="text-sm text-muted-foreground">Driver: {pool.driverProfile?.full_name || '—'}</p>
             <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
               <span>{format(new Date(pool.scheduled_date), 'MMM d, yyyy')} · {pool.scheduled_time}</span>
               <span>{pool.total_passengers} pax · {pool.allocations?.length || 0} req</span>
@@ -430,10 +432,10 @@ export default function Allocations() {
                           <TableCell>
                             <RouteDisplay 
                               pickup={request.pickup_location} 
-                              pickupName={(request as any).pickup_location_name}
+                              pickupName={request.pickup_location_name}
                               destination={request.dropoff_location}
-                              destinationName={(request as any).dropoff_location_name}
-                              stops={(request as any).stops}
+                              destinationName={request.dropoff_location_name}
+                              stops={request.stops}
                             />
                           </TableCell>
                           <TableCell>
@@ -570,15 +572,15 @@ export default function Allocations() {
                               )}
                             </TableCell>
                             <TableCell>
-                              {allocation.hailing_service ? '—' : ((allocation as any).driverProfile?.full_name || '—')}
+                              {allocation.hailing_service ? '—' : (allocation.driverProfile?.full_name || '—')}
                             </TableCell>
                             <TableCell>
                               <RouteDisplay 
                                 pickup={allocation.request?.pickup_location || ''} 
-                                pickupName={(allocation.request as any)?.pickup_location_name}
+                                pickupName={allocation.request?.pickup_location_name}
                                 destination={allocation.request?.dropoff_location || ''}
-                                destinationName={(allocation.request as any)?.dropoff_location_name}
-                                stops={(allocation as any).stops}
+                                destinationName={allocation.request?.dropoff_location_name}
+                                stops={allocation.stops}
                               />
                             </TableCell>
                             <TableCell>{format(new Date(allocation.scheduled_pickup), 'MMM d, h:mm a')}</TableCell>
@@ -678,7 +680,7 @@ export default function Allocations() {
                                 <><br /><span className="text-muted-foreground text-xs">{pool.vehicle.make} {pool.vehicle.model}</span></>
                               )}
                             </TableCell>
-                            <TableCell>{(pool as any).driverProfile?.full_name || '—'}</TableCell>
+                            <TableCell>{pool.driverProfile?.full_name || '—'}</TableCell>
                             <TableCell>
                               {format(new Date(pool.scheduled_date), 'MMM d, yyyy')}
                               <br /><span className="text-muted-foreground text-xs">{pool.scheduled_time}</span>

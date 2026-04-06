@@ -107,11 +107,12 @@ export default function TripSchedule() {
 
   const handlePrevious = () => {
     switch (viewMode) {
-      case 'day':
+      case 'day': {
         const prevDay = new Date(selectedDate);
         prevDay.setDate(prevDay.getDate() - 1);
         handleDateChange(prevDay);
         break;
+      }
       case 'week':
         setWeekStart(subWeeks(weekStart, 1));
         break;
@@ -123,11 +124,12 @@ export default function TripSchedule() {
 
   const handleNext = () => {
     switch (viewMode) {
-      case 'day':
+      case 'day': {
         const nextDay = new Date(selectedDate);
         nextDay.setDate(nextDay.getDate() + 1);
         handleDateChange(nextDay);
         break;
+      }
       case 'week':
         setWeekStart(addWeeks(weekStart, 1));
         break;
