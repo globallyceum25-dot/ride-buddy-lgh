@@ -139,10 +139,6 @@ export function useCreateUser() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      toast({
-        title: 'User created',
-        description: 'The new user account has been created successfully.',
-      });
     },
     onError: (error: Error) => {
       console.error('Create user error:', error);
