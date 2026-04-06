@@ -75,7 +75,7 @@ export function usePendingChangeRequests() {
 
       // Fetch related travel request info and requester profiles
       const enriched: ChangeRequest[] = [];
-      for (const cr of data) {
+      for (const cr of rawData) {
         const { data: tr } = await supabase
           .from('travel_requests')
           .select('request_number, pickup_location, pickup_location_name, dropoff_location, dropoff_location_name, pickup_datetime, passenger_count, purpose, requester_id, approver_id')
