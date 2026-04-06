@@ -174,20 +174,25 @@ export function useMyRequests(statusFilter?: RequestStatus) {
 }
 
 // Fetch requests pending user's approval
-export function usePendingApprovals() {
+export function usePendingApprovals(isAdmin = false) {
   return useQuery({
-    queryKey: ['pending-approvals'],
+    queryKey: ['pending-approvals', isAdmin],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       // Step 1: Fetch travel requests
-      const { data: requests, error } = await supabase
+      let query = supabase
         .from('travel_requests')
         .select('*')
-        .eq('approver_id', user.id)
         .eq('status', 'pending_approval')
         .order('created_at', { ascending: false });
+
+      if (!isAdmin) {
+        query = query.eq('approver_id', user.id);
+      }
+
+      const { data: requests, error } = await query;
 
       if (error) throw error;
       if (!requests || requests.length === 0) return [];
@@ -208,9 +213,9 @@ export function usePendingApprovals() {
 }
 
 // Fetch all approval requests (for approvers - all statuses)
-export function useApprovalRequests(statusFilter?: RequestStatus) {
+export function useApprovalRequests(statusFilter?: RequestStatus, isAdmin = false) {
   return useQuery({
-    queryKey: ['approval-requests', statusFilter],
+    queryKey: ['approval-requests', statusFilter, isAdmin],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
@@ -219,8 +224,11 @@ export function useApprovalRequests(statusFilter?: RequestStatus) {
       let query = supabase
         .from('travel_requests')
         .select('*')
-        .eq('approver_id', user.id)
         .order('created_at', { ascending: false });
+
+      if (!isAdmin) {
+        query = query.eq('approver_id', user.id);
+      }
 
       if (statusFilter) {
         query = query.eq('status', statusFilter);

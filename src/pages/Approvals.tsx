@@ -27,6 +27,9 @@ import { usePendingApprovals, useApprovalRequests, TravelRequest } from '@/hooks
 import { usePendingChangeRequests, ChangeRequest } from '@/hooks/useChangeRequests';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 
 type RequestStatus = Database['public']['Enums']['request_status'];
 
@@ -35,10 +38,12 @@ export default function Approvals() {
   const [selectedChangeRequest, setSelectedChangeRequest] = useState<ChangeRequest | null>(null);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'rejected' | 'changes'>('pending');
   const isMobile = useIsMobile();
+  const { isAdmin } = useAuth();
+  const adminFlag = isAdmin();
 
-  const { data: pendingRequests = [], isLoading: loadingPending } = usePendingApprovals();
-  const { data: approvedRequests = [], isLoading: loadingApproved } = useApprovalRequests('approved' as RequestStatus);
-  const { data: rejectedRequests = [], isLoading: loadingRejected } = useApprovalRequests('rejected' as RequestStatus);
+  const { data: pendingRequests = [], isLoading: loadingPending } = usePendingApprovals(adminFlag);
+  const { data: approvedRequests = [], isLoading: loadingApproved } = useApprovalRequests('approved' as RequestStatus, adminFlag);
+  const { data: rejectedRequests = [], isLoading: loadingRejected } = useApprovalRequests('rejected' as RequestStatus, adminFlag);
   const { data: pendingChanges = [], isLoading: loadingChanges } = usePendingChangeRequests();
 
   const renderMobileCards = (
@@ -236,6 +241,15 @@ export default function Approvals() {
             Review and approve travel requests assigned to you
           </p>
         </div>
+
+        {adminFlag && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              You are viewing all requests across the organization as an administrator.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Stats */}
         <div className="grid gap-4 grid-cols-3">
