@@ -241,6 +241,34 @@ export function useRemoveUserRole() {
   });
 }
 
+export function useResetUserPassword() {
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error('Not authenticated');
+
+      const response = await supabase.functions.invoke('reset-user-password', {
+        body: { user_id: userId },
+      });
+
+      if (response.error) throw new Error(response.error.message || 'Failed to reset password');
+      if (response.data?.error) throw new Error(response.data.error);
+
+      return response.data as { success: boolean; temporary_password: string };
+    },
+    onError: (error: Error) => {
+      console.error('Reset password error:', error);
+      toast({
+        title: 'Error resetting password',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
 export function useToggleUserActive() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
