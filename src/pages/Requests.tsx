@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { Plus, Eye, Edit, X, FileText, Zap } from 'lucide-react';
+import { Plus, Eye, Edit, X, FileText, Zap, PenLine } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
