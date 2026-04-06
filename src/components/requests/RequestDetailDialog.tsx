@@ -74,6 +74,9 @@ export function RequestDetailDialog({
   requestId 
 }: RequestDetailDialogProps) {
   const { data, isLoading } = useRequest(requestId || undefined);
+  const { data: changeRequests = [] } = useChangeRequestsForRequest(requestId || undefined);
+  const { user } = useAuth();
+  const [changeDialogOpen, setChangeDialogOpen] = useState(false);
 
   if (!requestId) return null;
 
@@ -81,6 +84,11 @@ export function RequestDetailDialog({
   const passengers = data?.passengers || [];
   const history = data?.history || [];
   const stops = data?.stops || [];
+
+  // Determine if user can request changes (owner, approved, no active allocation)
+  const isOwner = request?.requester_id === user?.id;
+  const canRequestChange = isOwner && request?.status === 'approved';
+  const hasPendingChange = changeRequests.some(cr => cr.status === 'pending');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
