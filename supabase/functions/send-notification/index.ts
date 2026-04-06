@@ -36,6 +36,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Validate JWT to prevent unauthorized invocations
+    const token = authHeader.replace("Bearer ", "");
+    const anonClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: claims, error: claimsError } = await anonClient.auth.getClaims(token);
+    if (claimsError || !claims?.claims?.sub) {
+      return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
