@@ -129,6 +129,11 @@ export default function Requests() {
                   {canEdit(request.status) && (
                     <DropdownMenuItem><Edit className="h-4 w-4 mr-2" />Edit</DropdownMenuItem>
                   )}
+                  {canRequestChange(request) && (
+                    <DropdownMenuItem onClick={() => setChangeRequest(request)}>
+                      <PenLine className="h-4 w-4 mr-2" />Request Change
+                    </DropdownMenuItem>
+                  )}
                   {canCancel(request.status) && (
                     <DropdownMenuItem onClick={() => handleCancel(request.id)} className="text-destructive">
                       <X className="h-4 w-4 mr-2" />Cancel
