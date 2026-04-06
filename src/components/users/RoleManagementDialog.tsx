@@ -25,6 +25,8 @@ interface RoleManagementDialogProps {
 export function RoleManagementDialog({ user, open, onOpenChange }: RoleManagementDialogProps) {
   const addRole = useAddUserRole();
   const removeRole = useRemoveUserRole();
+  const { roles: currentUserRoles } = useAuth();
+  const isCurrentUserGroupAdmin = currentUserRoles.includes('group_admin');
 
   if (!user) return null;
 
@@ -52,6 +54,8 @@ export function RoleManagementDialog({ user, open, onOpenChange }: RoleManagemen
           {ALL_ROLES.map((role) => {
             const isChecked = user.roles.includes(role.value);
             const isPending = addRole.isPending || removeRole.isPending;
+            // Admin-equivalent roles can only be viewed, not toggled by group_admins
+            const isRestricted = role.adminOnly && isCurrentUserGroupAdmin;
             
             return (
               <div
@@ -60,12 +64,15 @@ export function RoleManagementDialog({ user, open, onOpenChange }: RoleManagemen
               >
                 <Checkbox
                   checked={isChecked}
-                  disabled={isPending}
+                  disabled={isPending || isRestricted}
                   onCheckedChange={(checked) => handleRoleToggle(role.value, !!checked)}
                 />
                 <div className="space-y-0.5">
                   <span className="text-sm font-medium">{role.label}</span>
-                  <p className="text-xs text-muted-foreground">{role.description}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {role.description}
+                    {isRestricted && ' (restricted)'}
+                  </p>
                 </div>
               </div>
             );
