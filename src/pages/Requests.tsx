@@ -311,6 +311,21 @@ export default function Requests() {
                                 </Tooltip>
                               </TooltipProvider>
                             )}
+                            {pendingChangeIds?.has(request.id) && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Badge className="bg-orange-100 text-orange-800 border-orange-300 hover:bg-orange-100 gap-1 px-1.5 py-0.5 text-[10px]">
+                                      <PenLine className="h-3 w-3" />
+                                      Change Pending
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>This request has a pending change request</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>
