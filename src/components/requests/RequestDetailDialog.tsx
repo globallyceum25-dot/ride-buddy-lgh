@@ -479,6 +479,14 @@ export function RequestDetailDialog({
           )}
         </ScrollArea>
       </DialogContent>
+
+      {request && (
+        <ChangeRequestDialog
+          open={changeDialogOpen}
+          onOpenChange={setChangeDialogOpen}
+          request={request}
+        />
+      )}
     </Dialog>
   );
 }

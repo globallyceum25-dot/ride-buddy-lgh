@@ -33,7 +33,9 @@ import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
 import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
 import { useMyRequests, useCancelRequest, TravelRequest } from '@/hooks/useRequests';
+import { ChangeRequestDialog } from '@/components/requests/ChangeRequestDialog';
 import { Database } from '@/integrations/supabase/types';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 type RequestStatus = Database['public']['Enums']['request_status'];
