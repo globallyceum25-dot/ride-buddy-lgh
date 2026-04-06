@@ -12,6 +12,17 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Verify webhook secret to prevent spoofed requests
+    const webhookSecret = req.headers.get("X-Telegram-Bot-Api-Secret-Token");
+    const expectedSecret = Deno.env.get("TELEGRAM_WEBHOOK_SECRET");
+    if (expectedSecret && webhookSecret !== expectedSecret) {
+      console.error("Invalid webhook secret token");
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
