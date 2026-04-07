@@ -198,11 +198,48 @@ export default function Requests() {
               Submit and track your travel requests
             </p>
           </div>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Request
-          </Button>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <Button variant="outline" onClick={() => setIsLinkDialogOpen(true)}>
+                <Link2 className="h-4 w-4 mr-2" />
+                Share Form Link
+              </Button>
+            )}
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Request
+            </Button>
+          </div>
         </div>
+
+        {/* Generated Link Display */}
+        {generatedLink && (
+          <Alert className="border-primary/30 bg-primary/5">
+            <Link2 className="h-4 w-4" />
+            <AlertDescription>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{generatedLink.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{generatedLink.url}</p>
+                  {generatedLink.expires_at && (
+                    <p className="text-xs text-muted-foreground">
+                      Expires: {format(new Date(generatedLink.expires_at), 'MMM d, yyyy')}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={copyLink}>
+                    {linkCopied ? <Check className="h-3.5 w-3.5 mr-1" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+                    {linkCopied ? 'Copied' : 'Copy Link'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setGeneratedLink(null)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Filters */}
         <Card>
