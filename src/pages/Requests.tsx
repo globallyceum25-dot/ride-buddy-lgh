@@ -452,7 +452,11 @@ export default function Requests() {
         onOpenChange={(open) => !open && setViewRequestId(null)}
         requestId={viewRequestId}
       />
-      <ChangeRequestDialog
+      <CreateFormLinkDialog
+        open={isLinkDialogOpen}
+        onOpenChange={setIsLinkDialogOpen}
+        onSuccess={handleLinkCreated}
+      />
         open={!!changeRequest}
         onOpenChange={(open) => !open && setChangeRequest(null)}
         request={changeRequest}
