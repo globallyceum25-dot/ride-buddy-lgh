@@ -77,7 +77,7 @@ export function CreateFormLinkDialog({ open, onOpenChange, onSuccess }: CreateFo
   });
 
   const onSubmit = async (values: FormValues) => {
-    await createMutation.mutateAsync({
+    const result = await createMutation.mutateAsync({
       name: values.name,
       description: values.description || undefined,
       department_id: values.department_id === 'none' ? undefined : values.department_id,
@@ -87,6 +87,7 @@ export function CreateFormLinkDialog({ open, onOpenChange, onSuccess }: CreateFo
     queryClient.invalidateQueries({ queryKey: ['form-links'] });
     form.reset();
     onOpenChange(false);
+    onSuccess?.({ token: result.token, name: result.name, expires_at: result.expires_at });
   };
 
   return (
