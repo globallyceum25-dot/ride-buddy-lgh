@@ -51,6 +51,7 @@ type FormValues = z.infer<typeof formSchema>;
 interface CreateFormLinkDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: (data: { token: string; name: string; expires_at?: string }) => void;
 }
 
 export function CreateFormLinkDialog({ open, onOpenChange }: CreateFormLinkDialogProps) {
