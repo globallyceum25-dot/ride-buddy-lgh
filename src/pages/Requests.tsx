@@ -457,6 +457,7 @@ export default function Requests() {
         onOpenChange={setIsLinkDialogOpen}
         onSuccess={handleLinkCreated}
       />
+      <ChangeRequestDialog
         open={!!changeRequest}
         onOpenChange={(open) => !open && setChangeRequest(null)}
         request={changeRequest}
