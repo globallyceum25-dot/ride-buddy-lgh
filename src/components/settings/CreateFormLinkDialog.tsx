@@ -54,7 +54,7 @@ interface CreateFormLinkDialogProps {
   onSuccess?: (data: { token: string; name: string; expires_at?: string }) => void;
 }
 
-export function CreateFormLinkDialog({ open, onOpenChange }: CreateFormLinkDialogProps) {
+export function CreateFormLinkDialog({ open, onOpenChange, onSuccess }: CreateFormLinkDialogProps) {
   const createMutation = useCreateFormLink();
   const queryClient = useQueryClient();
   const { data: users } = useUsers();
