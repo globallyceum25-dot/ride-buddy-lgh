@@ -38,7 +38,7 @@ import { useMyRequests, useCancelRequest, TravelRequest } from '@/hooks/useReque
 import { ChangeRequestDialog } from '@/components/requests/ChangeRequestDialog';
 import { useMyPendingChangeRequestIds } from '@/hooks/useChangeRequests';
 import { useAuth } from '@/contexts/AuthContext';
-import { useSettings } from '@/hooks/useSettings';
+import { useSystemSettings } from '@/hooks/useSettings';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
