@@ -51,9 +51,10 @@ type FormValues = z.infer<typeof formSchema>;
 interface CreateFormLinkDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: (data: { token: string; name: string; expires_at?: string }) => void;
 }
 
-export function CreateFormLinkDialog({ open, onOpenChange }: CreateFormLinkDialogProps) {
+export function CreateFormLinkDialog({ open, onOpenChange, onSuccess }: CreateFormLinkDialogProps) {
   const createMutation = useCreateFormLink();
   const queryClient = useQueryClient();
   const { data: users } = useUsers();
@@ -76,7 +77,7 @@ export function CreateFormLinkDialog({ open, onOpenChange }: CreateFormLinkDialo
   });
 
   const onSubmit = async (values: FormValues) => {
-    await createMutation.mutateAsync({
+    const result = await createMutation.mutateAsync({
       name: values.name,
       description: values.description || undefined,
       department_id: values.department_id === 'none' ? undefined : values.department_id,
@@ -86,6 +87,7 @@ export function CreateFormLinkDialog({ open, onOpenChange }: CreateFormLinkDialo
     queryClient.invalidateQueries({ queryKey: ['form-links'] });
     form.reset();
     onOpenChange(false);
+    onSuccess?.({ token: result.token, name: result.name, expires_at: result.expires_at });
   };
 
   return (

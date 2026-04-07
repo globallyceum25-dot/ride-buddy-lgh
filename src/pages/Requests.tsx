@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Plus, Eye, Edit, X, FileText, Zap, PenLine } from 'lucide-react';
+import { Plus, Eye, Edit, X, FileText, Zap, PenLine, Link2, Copy, Check } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,15 +28,20 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RequestDialog } from '@/components/requests/RequestDialog';
 import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
 import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
+import { CreateFormLinkDialog } from '@/components/settings/CreateFormLinkDialog';
 import { useMyRequests, useCancelRequest, TravelRequest } from '@/hooks/useRequests';
 import { ChangeRequestDialog } from '@/components/requests/ChangeRequestDialog';
 import { useMyPendingChangeRequestIds } from '@/hooks/useChangeRequests';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSystemSettings } from '@/hooks/useSettings';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { toast } from 'sonner';
 
 type RequestStatus = Database['public']['Enums']['request_status'];
 
@@ -52,19 +57,45 @@ const statusOptions: { value: RequestStatus | 'all'; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const DEFAULT_DOMAIN = 'https://ride-buddy-lgh.lovable.app';
+
 export default function Requests() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<{ url: string; name: string; expires_at?: string } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [viewRequestId, setViewRequestId] = useState<string | null>(null);
   const [changeRequest, setChangeRequest] = useState<TravelRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const isMobile = useIsMobile();
+  const { isAdmin } = useAuth();
+  const { data: settings } = useSystemSettings();
+
+  const publishedDomain = useMemo(() => {
+    const generalSettings = settings?.find(s => s.key === 'general');
+    const domain = (generalSettings?.value as Record<string, string>)?.published_domain;
+    return domain || DEFAULT_DOMAIN;
+  }, [settings]);
 
   const { data: requests = [], isLoading } = useMyRequests(
     statusFilter === 'all' ? undefined : statusFilter
   );
   const cancelRequest = useCancelRequest();
   const { data: pendingChangeIds } = useMyPendingChangeRequestIds();
+
+  const handleLinkCreated = (data: { token: string; name: string; expires_at?: string }) => {
+    const url = `${publishedDomain}/#/public-request/${data.token}`;
+    setGeneratedLink({ url, name: data.name, expires_at: data.expires_at });
+    setLinkCopied(false);
+  };
+
+  const copyLink = async () => {
+    if (!generatedLink) return;
+    await navigator.clipboard.writeText(generatedLink.url);
+    setLinkCopied(true);
+    toast.success('Link copied to clipboard');
+  };
 
   const canRequestChange = (r: TravelRequest) => r.status === 'approved';
 
@@ -167,11 +198,48 @@ export default function Requests() {
               Submit and track your travel requests
             </p>
           </div>
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Request
-          </Button>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <Button variant="outline" onClick={() => setIsLinkDialogOpen(true)}>
+                <Link2 className="h-4 w-4 mr-2" />
+                Share Form Link
+              </Button>
+            )}
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Request
+            </Button>
+          </div>
         </div>
+
+        {/* Generated Link Display */}
+        {generatedLink && (
+          <Alert className="border-primary/30 bg-primary/5">
+            <Link2 className="h-4 w-4" />
+            <AlertDescription>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{generatedLink.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{generatedLink.url}</p>
+                  {generatedLink.expires_at && (
+                    <p className="text-xs text-muted-foreground">
+                      Expires: {format(new Date(generatedLink.expires_at), 'MMM d, yyyy')}
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={copyLink}>
+                    {linkCopied ? <Check className="h-3.5 w-3.5 mr-1" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+                    {linkCopied ? 'Copied' : 'Copy Link'}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setGeneratedLink(null)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Filters */}
         <Card>
@@ -383,6 +451,11 @@ export default function Requests() {
         open={!!viewRequestId} 
         onOpenChange={(open) => !open && setViewRequestId(null)}
         requestId={viewRequestId}
+      />
+      <CreateFormLinkDialog
+        open={isLinkDialogOpen}
+        onOpenChange={setIsLinkDialogOpen}
+        onSuccess={handleLinkCreated}
       />
       <ChangeRequestDialog
         open={!!changeRequest}
