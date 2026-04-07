@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Plus, Eye, Edit, X, FileText, Zap, PenLine } from 'lucide-react';
+import { Plus, Eye, Edit, X, FileText, Zap, PenLine, Link2, Copy, Check } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,15 +28,20 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RequestDialog } from '@/components/requests/RequestDialog';
 import { RequestDetailDialog } from '@/components/requests/RequestDetailDialog';
 import { RequestStatusBadge } from '@/components/requests/RequestStatusBadge';
 import { RequestPriorityBadge } from '@/components/requests/RequestPriorityBadge';
+import { CreateFormLinkDialog } from '@/components/settings/CreateFormLinkDialog';
 import { useMyRequests, useCancelRequest, TravelRequest } from '@/hooks/useRequests';
 import { ChangeRequestDialog } from '@/components/requests/ChangeRequestDialog';
 import { useMyPendingChangeRequestIds } from '@/hooks/useChangeRequests';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSettings } from '@/hooks/useSettings';
 import { Database } from '@/integrations/supabase/types';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { toast } from 'sonner';
 
 type RequestStatus = Database['public']['Enums']['request_status'];
 
