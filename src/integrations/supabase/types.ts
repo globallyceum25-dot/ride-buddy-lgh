@@ -923,6 +923,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_driver: {
+        Args: { _driver_id: string; _user_id: string }
+        Returns: boolean
+      }
       can_view_request: {
         Args: { _request_id: string; _user_id: string }
         Returns: boolean
