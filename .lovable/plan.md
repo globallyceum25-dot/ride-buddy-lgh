@@ -1,44 +1,78 @@
 
 
-# Generate Shareable Request Links from the Requests Page
+# Fix Infinite Recursion in Drivers RLS Policy
 
-## Problem
-The "Generate Public Form Link" feature currently lives only in **Settings > Public Form Links**, accessible only to admins. Regular users (requesters) cannot generate shareable links to let external guests submit travel requests on their behalf.
+## Root Cause
+The `drivers` table returns **HTTP 500** with error `"infinite recursion detected in policy for relation 'drivers'"` (Postgres error 42P17). This breaks:
+- Drivers page (completely fails to load)
+- Allocations page (joins to `drivers` fail, so allocations with driver data don't render)
+- Any page that queries `drivers` (trip schedule, reports, etc.)
 
-## Approach
-Add a "Share Request Form" button on the Requests page that allows **admin users** to quickly generate a public form link without navigating to Settings. This reuses the existing `CreateFormLinkDialog` and `useCreateFormLink` hook, and displays the generated link with a copy button — all within the Requests page context.
+The problematic policy is **"Users can view assigned driver info"**:
+```sql
+USING (
+  (user_id = auth.uid()) OR is_admin(auth.uid()) OR 
+  (EXISTS (
+    SELECT 1 FROM allocations
+    WHERE allocations.driver_id = drivers.id
+    AND EXISTS (
+      SELECT 1 FROM travel_requests
+      WHERE travel_requests.id = allocations.request_id
+      AND travel_requests.requester_id = auth.uid()
+    )
+  ))
+)
+```
 
-Since public form links control who can submit requests to the organization (a security-sensitive action per OWASP A01), link generation remains restricted to admin users only. Non-admin users will not see the button.
+When PostgREST evaluates queries like `allocations JOIN drivers`, it checks the drivers RLS policy, which queries `allocations`, which also has RLS policies that may reference `drivers` — creating infinite recursion.
 
-## Changes
+## Solution
+Replace the recursive policy with a `SECURITY DEFINER` function that bypasses RLS when checking if a user can view a driver. This follows the same pattern already used successfully in this project for `has_role()`, `is_admin()`, and `can_view_request()`.
 
-### 1. `src/pages/Requests.tsx`
-- Import `useAuth` to check admin status, `Link2` icon from lucide-react
-- Import `CreateFormLinkDialog` from settings
-- Add a "Share Form Link" button next to the existing "New Request" button (visible to admins only)
-- Add state for the dialog open/close
-- After successful creation, show a toast with the generated link and a copy-to-clipboard action
+### Step 1: Create a `can_view_driver` function
+```sql
+CREATE OR REPLACE FUNCTION public.can_view_driver(_user_id uuid, _driver_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM drivers WHERE id = _driver_id AND user_id = _user_id
+  )
+  OR public.is_admin(_user_id)
+  OR EXISTS (
+    SELECT 1 FROM allocations a
+    JOIN travel_requests tr ON tr.id = a.request_id
+    WHERE a.driver_id = _driver_id
+    AND tr.requester_id = _user_id
+  )
+$$;
+```
 
-### 2. `src/components/settings/CreateFormLinkDialog.tsx`
-- Add an optional `onSuccess` callback prop so the Requests page can receive the created link data (token) and display it
-- Currently the dialog calls `queryClient.invalidateQueries` and closes — extend to also call `onSuccess` with the created link
+### Step 2: Replace the problematic policy
+Drop the existing recursive policies on `drivers` and create clean replacements:
 
-### 3. Add a `GeneratedLinkDisplay` inline component
-- After link creation, show a small card/alert on the Requests page with:
-  - The full shareable URL
-  - A "Copy Link" button
-  - Link name and expiry info
-- Auto-dismiss after user copies or clicks away
+```sql
+DROP POLICY IF EXISTS "Users can view assigned driver info" ON drivers;
+DROP POLICY IF EXISTS "Drivers can view their own record" ON drivers;
 
-## Security Considerations
-- Only admins can generate links (enforced by RLS on `public_form_links` INSERT and by UI gating via `isAdmin()`)
-- Generated tokens are cryptographically random (32-character hex from `gen_random_bytes(16)`)
-- Links respect expiry dates and active/inactive status
-- Guest submissions are validated against active, non-expired `form_link_id` via RLS
+CREATE POLICY "Users can view relevant drivers"
+  ON drivers FOR SELECT TO authenticated
+  USING (public.can_view_driver(auth.uid(), id));
+```
+
+The "Admins can manage drivers" ALL policy remains unchanged.
+
+## Impact
+- Fixes the Drivers page (currently completely broken)
+- Fixes driver data in Allocations, Trip Schedule, and Reports
+- No application code changes needed — only database-level fix
+- Security model unchanged: same access rules, just implemented without recursion
 
 ## Files to modify
 | File | Change |
 |------|--------|
-| `src/pages/Requests.tsx` | Add "Share Form Link" button for admins, integrate CreateFormLinkDialog |
-| `src/components/settings/CreateFormLinkDialog.tsx` | Add `onSuccess` callback prop |
+| New migration SQL | Create `can_view_driver` function, replace drivers RLS policies |
 
