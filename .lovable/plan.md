@@ -1,37 +1,44 @@
 
 
-# Regenerate Temporary Password for Existing Users
+# Generate Shareable Request Links from the Requests Page
 
-## Summary
-Add a "Reset Password" action to the Users page dropdown menu that calls a new edge function to generate a fresh temporary password server-side and displays it to the admin in a secure dialog.
+## Problem
+The "Generate Public Form Link" feature currently lives only in **Settings > Public Form Links**, accessible only to admins. Regular users (requesters) cannot generate shareable links to let external guests submit travel requests on their behalf.
+
+## Approach
+Add a "Share Request Form" button on the Requests page that allows **admin users** to quickly generate a public form link without navigating to Settings. This reuses the existing `CreateFormLinkDialog` and `useCreateFormLink` hook, and displays the generated link with a copy button — all within the Requests page context.
+
+Since public form links control who can submit requests to the organization (a security-sensitive action per OWASP A01), link generation remains restricted to admin users only. Non-admin users will not see the button.
 
 ## Changes
 
-### 1. New Edge Function: `supabase/functions/reset-user-password/index.ts`
-- Accepts `{ user_id: string }` in the request body
-- Validates JWT, checks caller is `group_admin` (same pattern as `admin-create-user`)
-- Uses `adminClient.auth.admin.updateUserById(user_id, { password: newPassword })` to set a new CSPRNG 16-character password
-- Returns `{ temporary_password }` in the response
-- Reuses the same `generateSecurePassword()` logic from `admin-create-user`
+### 1. `src/pages/Requests.tsx`
+- Import `useAuth` to check admin status, `Link2` icon from lucide-react
+- Import `CreateFormLinkDialog` from settings
+- Add a "Share Form Link" button next to the existing "New Request" button (visible to admins only)
+- Add state for the dialog open/close
+- After successful creation, show a toast with the generated link and a copy-to-clipboard action
 
-### 2. `src/hooks/useUsers.ts`
-- Add `useResetUserPassword()` mutation hook that invokes the new edge function and returns the generated password
+### 2. `src/components/settings/CreateFormLinkDialog.tsx`
+- Add an optional `onSuccess` callback prop so the Requests page can receive the created link data (token) and display it
+- Currently the dialog calls `queryClient.invalidateQueries` and closes — extend to also call `onSuccess` with the created link
 
-### 3. `src/pages/Users.tsx`
-- Add a `KeyRound` icon "Reset Password" item to the user action dropdown menu
-- On click, show a confirmation dialog ("Are you sure you want to reset this user's password?")
-- On confirm, call the mutation; on success, show the same secure password display dialog used in `CreateUserDialog` (with copy/show/hide and "won't be shown again" warning)
+### 3. Add a `GeneratedLinkDisplay` inline component
+- After link creation, show a small card/alert on the Requests page with:
+  - The full shareable URL
+  - A "Copy Link" button
+  - Link name and expiry info
+- Auto-dismiss after user copies or clicks away
 
-### 4. Fix existing build errors (while editing these files)
-- `src/components/settings/PublicFormLinks.tsx` line 184: cast `unknown` to `ReactNode`
-- `src/hooks/useChangeRequests.ts` line 135: fix the insert call shape
+## Security Considerations
+- Only admins can generate links (enforced by RLS on `public_form_links` INSERT and by UI gating via `isAdmin()`)
+- Generated tokens are cryptographically random (32-character hex from `gen_random_bytes(16)`)
+- Links respect expiry dates and active/inactive status
+- Guest submissions are validated against active, non-expired `form_link_id` via RLS
 
-## Files to modify/create
+## Files to modify
 | File | Change |
 |------|--------|
-| `supabase/functions/reset-user-password/index.ts` | New edge function |
-| `src/hooks/useUsers.ts` | Add `useResetUserPassword()` hook |
-| `src/pages/Users.tsx` | Add reset password action + confirmation/display dialogs |
-| `src/components/settings/PublicFormLinks.tsx` | Fix TS2322 build error |
-| `src/hooks/useChangeRequests.ts` | Fix TS2769 build error |
+| `src/pages/Requests.tsx` | Add "Share Form Link" button for admins, integrate CreateFormLinkDialog |
+| `src/components/settings/CreateFormLinkDialog.tsx` | Add `onSuccess` callback prop |
 
