@@ -57,19 +57,45 @@ const statusOptions: { value: RequestStatus | 'all'; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const DEFAULT_DOMAIN = 'https://ride-buddy-lgh.lovable.app';
+
 export default function Requests() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<{ url: string; name: string; expires_at?: string } | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [viewRequestId, setViewRequestId] = useState<string | null>(null);
   const [changeRequest, setChangeRequest] = useState<TravelRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const isMobile = useIsMobile();
+  const { isAdmin } = useAuth();
+  const { data: settings } = useSystemSettings();
+
+  const publishedDomain = useMemo(() => {
+    const generalSettings = settings?.find(s => s.key === 'general');
+    const domain = (generalSettings?.value as Record<string, string>)?.published_domain;
+    return domain || DEFAULT_DOMAIN;
+  }, [settings]);
 
   const { data: requests = [], isLoading } = useMyRequests(
     statusFilter === 'all' ? undefined : statusFilter
   );
   const cancelRequest = useCancelRequest();
   const { data: pendingChangeIds } = useMyPendingChangeRequestIds();
+
+  const handleLinkCreated = (data: { token: string; name: string; expires_at?: string }) => {
+    const url = `${publishedDomain}/#/public-request/${data.token}`;
+    setGeneratedLink({ url, name: data.name, expires_at: data.expires_at });
+    setLinkCopied(false);
+  };
+
+  const copyLink = async () => {
+    if (!generatedLink) return;
+    await navigator.clipboard.writeText(generatedLink.url);
+    setLinkCopied(true);
+    toast.success('Link copied to clipboard');
+  };
 
   const canRequestChange = (r: TravelRequest) => r.status === 'approved';
 
